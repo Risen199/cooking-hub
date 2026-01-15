@@ -201,6 +201,9 @@
     <button onclick="selectDelivery('pickup')" class="btn-pickup">I'll collect from the kitchen</button>
     <button onclick="selectDelivery('delivery')" class="btn-delivery">Deliver to me</button>
     <button onclick="closeModal()" class="btn-cancel">Cancel</button>
+    <button onclick="openDeliveryModal()" class="btn-checkout">
+  CHECK OUT
+</button>
   </div>
 </div>
 
@@ -543,6 +546,59 @@
         document.getElementById('menu-container').innerHTML = `<div class="col-12 text-center py-5"><p class="text-danger">Failed to load menu.</p></div>`;
       }
     });
+    let selectedDelivery = null;
+let selectedTime = null;
+
+function openDeliveryModal() {
+  document.getElementById('delivery-modal').style.display = 'flex';
+}
+
+function selectDelivery(type) {
+  selectedDelivery = type;
+  document.getElementById('delivery-modal').style.display = 'none';
+  
+  // Show time selector
+  if (type === 'pickup') {
+    document.getElementById('pickup-time').style.display = 'block';
+    document.getElementById('delivery-time').style.display = 'none';
+  } else {
+    document.getElementById('pickup-time').style.display = 'none';
+    document.getElementById('delivery-time').style.display = 'block';
+  }
+  
+  document.getElementById('time-selector').style.display = 'flex';
+}
+
+function confirmOrder() {
+  let timeText = "";
+  
+  if (selectedDelivery === 'pickup') {
+    const time = document.getElementById('pickup-time-input').value;
+    timeText = `PICKUP at ${time}`;
+  } else {
+    const start = document.getElementById('delivery-start').value;
+    const end = document.getElementById('delivery-end').value;
+    timeText = `DELIVER between ${start}–${end}`;
+  }
+
+  // Build WhatsApp message with time
+  const items = cart.map(i => i.name).join(", ");
+  const message = `${vendorId} ORDER: ${items} | ${timeText} | ${selectedDelivery.toUpperCase()}`;
+
+  // Open WhatsApp
+  window.open(`https://wa.me/276XXXXXXXX?text=${encodeURIComponent(message)}`);
+  
+  closeModal();
+  closeTimeSelector();
+}
+
+function closeModal() {
+  document.getElementById('delivery-modal').style.display = 'none';
+}
+
+function closeTimeSelector() {
+  document.getElementById('time-selector').style.display = 'none';
+}
   </script>
 </body>
 </html>
