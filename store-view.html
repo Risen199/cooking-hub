@@ -38,16 +38,6 @@
                   url('assets/images/image.webp') no-repeat center center;
       background-size: cover;
     }
-    .time-banner {
-      background: var(--brand-red);
-      color: white;
-      padding: 10px;
-      font-weight: bold;
-      text-align: center;
-      border-radius: 0 0 10px 10px;
-      margin-bottom: 20px;
-      display: none;
-    }
     .cart-summary {
       position: fixed;
       bottom: 0;
@@ -123,28 +113,26 @@
     .cart-overlay.active {
       display: block;
     }
-    #delivery-options, #delivery-form {
-      transition: opacity 0.3s;
-    }
     .hidden {
       display: none !important;
     }
     #menu-container {
       min-height: 200px;
     }
-    .btn-checkout,
-    .view-cart-arrow {
-      color: var(--brand-red) !important;
+    .btn-checkout {
+      background-color: var(--brand-red) !important;
+      color: white !important;
+      border: 2px solid #00000040 !important;
+      padding: 12px 24px;
       font-weight: bold;
+      border-radius: 8px;
     }
-.btn-checkout {
-  background-color: var(--brand-red) !important;
-  color: white !important; /* 🔥 CRITICAL */
-  border: 2px solid #00000040 !important; /* subtle dark outline */
-  padding: 12px 24px;
-  font-weight: bold;
-  border-radius: 8px;
-}
+    .time-note {
+      font-size: 0.875rem;
+      color: #666;
+      margin-top: 8px;
+      text-align: center;
+    }
   </style>
 </head>
 <body data-wa-number="27726515909">
@@ -178,8 +166,6 @@
     </div>
   </section>
 
-  <div class="time-banner" id="time-banner"></div>
-
   <section class="py-5 bg-light">
     <div class="container">
       <h2 class="text-center mb-5 fw-bold" style="color: var(--brand-red);">Our Menu</h2>
@@ -192,44 +178,6 @@
       </div>
     </div>
   </section>
-
-  <!-- This modal appears after clicking "CHECK OUT" -->
-<div id="delivery-modal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <h3>How would you like to receive your order?</h3>
-    
-    <button onclick="selectDelivery('pickup')" class="btn-pickup">I'll collect from the kitchen</button>
-    <button onclick="selectDelivery('delivery')" class="btn-delivery">Deliver to me</button>
-    <button onclick="closeModal()" class="btn-cancel">Cancel</button>
-    <button onclick="openDeliveryModal()" class="btn-checkout">
-  CHECK OUT
-</button>
-  </div>
-</div>
-
-<!-- Hidden time selector (appears after choice) -->
-<div id="time-selector" class="modal" style="display:none;">
-  <div class="modal-content">
-    <h3>Select Pickup/Delivery Time</h3>
-    
-    <!-- For pickup -->
-    <div id="pickup-time" style="display:none;">
-      <label>Pickup at:</label>
-      <input type="time" id="pickup-time-input" min="12:00" max="20:00" value="18:00">
-    </div>
-    
-    <!-- For delivery -->
-    <div id="delivery-time" style="display:none;">
-      <label>Deliver between:</label>
-      <input type="time" id="delivery-start" min="12:00" max="20:00" value="17:30">
-      <span>and</span>
-      <input type="time" id="delivery-end" min="12:00" max="20:00" value="18:30">
-    </div>
-    
-    <button onclick="confirmOrder()" class="btn-confirm">Confirm Order</button>
-    <button onclick="closeTimeSelector()" class="btn-cancel">Back</button>
-  </div>
-</div>
 
   <div class="cart-summary shadow-lg" id="cart-summary">
     <div class="container d-flex justify-content-between align-items-center">
@@ -265,25 +213,79 @@
   <script>
     const API_URL = 'https://script.google.com/macros/s/AKfycbx2GHqfDnDkeVhlgCBZIjyE9EZB1AGEjJzgJ_WHEcHel1JWRp_J1zenEdq0ifkw-qb8/exec';
 
-    function calculateReadyTime() {
+    // Store hours (will be set after loading vendor)
+    let storeHours = {
+      opening: null,
+      closing: null
+    };
+
+    // Generate 30-min pickup slots based on current time + prep rule
+    function generatePickupSlots() {
       const now = new Date();
-      const prepMinutes = 60;
-      const readyTime = new Date(now.getTime() + prepMinutes * 60000);
-      
-      const open = new Date();
-      open.setHours(8, 30, 0, 0);
-      const close = new Date();
-      close.setHours(18, 0, 0, 0);
+      const oneHourLater = new Date(now.getTime() + 60 * 60000);
 
-      if (readyTime > close) {
-        return "Last order! Ready by 6:00 PM";
-      }
-      if (now < open) {
-        return "Orders start at 8:30 AM";
+      // Round up to next 30-min mark
+      let start = new Date(oneHourLater);
+      const minutes = start.getMinutes();
+      if (minutes <= 30) {
+        start.setMinutes(30, 0, 0);
+      } else {
+        start.setHours(start.getHours() + 1, 0, 0, 0);
       }
 
-      const options = { hour: 'numeric', minute: '2-digit', hour12: true };
-      return `Your order will be ready by ${readyTime.toLocaleTimeString([], options)}`;
+      // Parse store hours (from Google Sheets)
+      const openTime = parseTime(storeHours.opening || "08:30");
+      const closeTime = parseTime(storeHours.closing || "18:00");
+
+      const openDate = new Date();
+      openDate.setHours(openTime.h, openTime.m, 0, 0);
+      const closeDate = new Date();
+      closeDate.setHours(closeTime.h, closeTime.m, 0, 0);
+
+      // If it's past closing, no slots
+      if (now >= closeDate) {
+        return { error: "Kitchen is closed. Orders reopen tomorrow." };
+      }
+
+      // Earliest slot must be after opening + 1h prep
+      const earliestSlot = new Date(Math.max(start, openDate));
+      if (earliestSlot >= closeDate) {
+        return { error: "Too late to order. Kitchen closes soon." };
+      }
+
+      // Generate 30-min slots up to closing time
+      const slots = [];
+      let current = new Date(earliestSlot);
+      while (current < closeDate) {
+        const end = new Date(current.getTime() + 30 * 60000);
+        if (end > closeDate) break;
+
+        const options = { hour: 'numeric', minute: '2-digit', hour12: true };
+        slots.push({
+          start: new Date(current),
+          end: new Date(end),
+          label: `${current.toLocaleTimeString([], options)} – ${end.toLocaleTimeString([], options)}`
+        });
+
+        current = end;
+        // Limit to ~5 slots to avoid overload
+        if (slots.length >= 5) break;
+      }
+
+      if (slots.length === 0) {
+        return { error: "No available pickup times." };
+      }
+
+      return { slots, firstSlot: slots[0].start };
+    }
+
+    function parseTime(timeStr) {
+      // Accepts "08:30" or "8:30"
+      const parts = timeStr.trim().split(':');
+      return {
+        h: parseInt(parts[0], 10),
+        m: parseInt(parts[1], 10) || 0
+      };
     }
 
     document.addEventListener('DOMContentLoaded', async function () {
@@ -325,11 +327,9 @@
         const primaryColor = store.Primary_Color || '#ff0000';
         document.documentElement.style.setProperty('--brand-red', primaryColor);
 
-        const timeBanner = document.getElementById('time-banner');
-        if (sessionStorage.getItem('deliveryMode') === 'scheduled') {
-          timeBanner.textContent = calculateReadyTime();
-          timeBanner.style.display = 'block';
-        }
+        // ✅ Load store hours from Google Sheets
+        storeHours.opening = store.Opening_Time || "08:30";
+        storeHours.closing = store.Closing_Time || "18:00";
 
         const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
         const menuData = await menuRes.json();
@@ -392,7 +392,6 @@
             });
             cartItemsList.innerHTML = html;
 
-            // Rebind remove buttons
             document.querySelectorAll('.remove-item').forEach(btn => {
               btn.addEventListener('click', function() {
                 const id = this.dataset.id;
@@ -410,7 +409,6 @@
           }
         }
 
-        // Bind add buttons
         document.querySelectorAll('.btn-add').forEach(button => {
           button.addEventListener('click', function() {
             const item = this.closest('.menu-item');
@@ -428,7 +426,6 @@
           });
         });
 
-        // Cart drawer toggle
         cartSummary.addEventListener('click', function() {
           cartDrawer.classList.add('active');
           cartOverlay.classList.add('active');
@@ -444,7 +441,7 @@
           cartOverlay.classList.remove('active');
         });
 
-        // Checkout flow
+        // ✅ NEW CHECKOUT FLOW WITH TIME SELECTION
         document.getElementById('checkout-btn').addEventListener('click', function() {
           if (cart.length === 0) return;
 
@@ -458,10 +455,16 @@
           modal.innerHTML = `
             <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
               <div id="delivery-options">
-                <h4 class="mb-4">How would you like to receive your order?</h4>
+                <h4 class="mb-3">How would you like to receive your order?</h4>
                 <button class="btn btn-outline-primary w-100 mb-3 py-3" id="opt-collection">I'll collect from the kitchen</button>
                 <button class="btn btn-outline-success w-100 mb-3 py-3" id="opt-delivery">Deliver to me</button>
                 <button class="btn btn-secondary w-100 py-2" id="close-delivery-modal">Cancel</button>
+              </div>
+              <div id="pickup-time-selector" class="hidden">
+                <h4 class="mb-3">Choose Pickup Time</h4>
+                <p class="time-note">Kitchens need 1 hour to prepare your order. Pickup slots start from the next available window.</p>
+                <div id="time-slots" class="mt-3"></div>
+                <button class="btn btn-secondary w-100 mt-3 py-2" id="back-to-delivery">← Back</button>
               </div>
               <div id="delivery-form" class="hidden">
                 <h4 class="mb-3">Delivery Details</h4>
@@ -474,29 +477,63 @@
                   </label>
                 </div>
                 <button class="btn btn-success w-100 mb-2 py-3" id="confirm-delivery">Confirm Delivery</button>
-                <button class="btn btn-secondary w-100 py-2" id="back-to-options">← Back to Options</button>
+                <button class="btn btn-secondary w-100 py-2" id="back-to-delivery2">← Back</button>
               </div>
             </div>
           `;
           document.body.appendChild(modal);
 
+          // Show delivery options
           function showOptions() {
             document.getElementById('delivery-options').classList.remove('hidden');
+            document.getElementById('pickup-time-selector').classList.add('hidden');
             document.getElementById('delivery-form').classList.add('hidden');
           }
-          function showForm() {
+
+          // Show pickup time selector
+          function showPickupSelector() {
+            const { slots, error } = generatePickupSlots();
+            const timeSlotsDiv = document.getElementById('time-slots');
+            
+            if (error) {
+              timeSlotsDiv.innerHTML = `<p class="text-danger">${error}</p>`;
+              return;
+            }
+
+            let slotsHtml = '';
+            slots.forEach(slot => {
+              slotsHtml += `<button class="btn btn-outline-dark w-100 mb-2 py-2 pickup-slot" data-start="${slot.start.toISOString()}">${slot.label}</button>`;
+            });
+            timeSlotsDiv.innerHTML = slotsHtml;
+
+            document.querySelectorAll('.pickup-slot').forEach(btn => {
+              btn.addEventListener('click', () => {
+                const selectedTime = btn.textContent;
+                sendOrder('Collection', '', selectedTime);
+                document.body.removeChild(modal);
+                cartDrawer.classList.remove('active');
+                cartOverlay.classList.remove('active');
+              });
+            });
+
             document.getElementById('delivery-options').classList.add('hidden');
-            document.getElementById('delivery-form').classList.remove('hidden');
+            document.getElementById('pickup-time-selector').classList.remove('hidden');
           }
 
-          modal.querySelector('#opt-collection').addEventListener('click', () => {
-            sendOrder('Collection', '');
-            document.body.removeChild(modal);
-            cartDrawer.classList.remove('active');
-            cartOverlay.classList.remove('active');
+          // Handle collection
+          modal.querySelector('#opt-collection').addEventListener('click', showPickupSelector);
+          
+          // Handle delivery
+          modal.querySelector('#opt-delivery').addEventListener('click', () => {
+            document.getElementById('delivery-options').classList.add('hidden');
+            document.getElementById('delivery-form').classList.remove('hidden');
           });
-          modal.querySelector('#opt-delivery').addEventListener('click', showForm);
-          modal.querySelector('#back-to-options').addEventListener('click', showOptions);
+
+          // Back buttons
+          modal.querySelector('#back-to-delivery').addEventListener('click', showOptions);
+          modal.querySelector('#back-to-delivery2').addEventListener('click', showOptions);
+
+          // Confirm delivery
           modal.querySelector('#confirm-delivery').addEventListener('click', () => {
             const area = document.getElementById('delivery-area').value.trim();
             const street = document.getElementById('delivery-street').value.trim();
@@ -509,35 +546,40 @@
             if (shareLoc) {
               deliveryNote += '\n\nI will share my live location on WhatsApp once you confirm!';
             }
-            sendOrder('Delivery', deliveryNote);
+            sendOrder('Delivery', deliveryNote, '');
             document.body.removeChild(modal);
             cartDrawer.classList.remove('active');
             cartOverlay.classList.remove('active');
           });
+
+          // Close modal
           modal.querySelector('#close-delivery-modal').addEventListener('click', () => {
             document.body.removeChild(modal);
           });
         });
 
-        function sendOrder(deliveryType, deliveryNote) {
+        // Send order with optional pickup time
+        function sendOrder(deliveryType, deliveryNote, pickupTime = '') {
           const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
           const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
           
           let msg = `Hi! I'd like to place an order:\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}`;
           
-          if (sessionStorage.getItem('deliveryMode') === 'scheduled') {
-            msg += `\n\n${calculateReadyTime()}`;
+          if (pickupTime) {
+            msg += `\n\nPickup window: ${pickupTime}`;
+          } else if (deliveryType === 'Collection') {
+            // Fallback (shouldn't happen)
+            msg += `\n\nI'll collect from your kitchen.`;
           }
 
           if (deliveryType === 'Delivery' && deliveryNote) {
             msg += `\n\n${deliveryNote}`;
-          } else if (deliveryType === 'Collection') {
+          } else if (deliveryType === 'Collection' && !pickupTime) {
             msg += `\n\nI'll collect from your kitchen.`;
           }
 
           const waNumber = document.body.dataset.waNumber;
           window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-          sessionStorage.removeItem('deliveryMode');
         }
 
       } catch (error) {
@@ -546,59 +588,6 @@
         document.getElementById('menu-container').innerHTML = `<div class="col-12 text-center py-5"><p class="text-danger">Failed to load menu.</p></div>`;
       }
     });
-    let selectedDelivery = null;
-let selectedTime = null;
-
-function openDeliveryModal() {
-  document.getElementById('delivery-modal').style.display = 'flex';
-}
-
-function selectDelivery(type) {
-  selectedDelivery = type;
-  document.getElementById('delivery-modal').style.display = 'none';
-  
-  // Show time selector
-  if (type === 'pickup') {
-    document.getElementById('pickup-time').style.display = 'block';
-    document.getElementById('delivery-time').style.display = 'none';
-  } else {
-    document.getElementById('pickup-time').style.display = 'none';
-    document.getElementById('delivery-time').style.display = 'block';
-  }
-  
-  document.getElementById('time-selector').style.display = 'flex';
-}
-
-function confirmOrder() {
-  let timeText = "";
-  
-  if (selectedDelivery === 'pickup') {
-    const time = document.getElementById('pickup-time-input').value;
-    timeText = `PICKUP at ${time}`;
-  } else {
-    const start = document.getElementById('delivery-start').value;
-    const end = document.getElementById('delivery-end').value;
-    timeText = `DELIVER between ${start}–${end}`;
-  }
-
-  // Build WhatsApp message with time
-  const items = cart.map(i => i.name).join(", ");
-  const message = `${vendorId} ORDER: ${items} | ${timeText} | ${selectedDelivery.toUpperCase()}`;
-
-  // Open WhatsApp
-  window.open(`https://wa.me/276XXXXXXXX?text=${encodeURIComponent(message)}`);
-  
-  closeModal();
-  closeTimeSelector();
-}
-
-function closeModal() {
-  document.getElementById('delivery-modal').style.display = 'none';
-}
-
-function closeTimeSelector() {
-  document.getElementById('time-selector').style.display = 'none';
-}
   </script>
 </body>
 </html>
