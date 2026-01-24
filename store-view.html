@@ -245,349 +245,354 @@
   <a href="https://wa.me/27726515909" class="whatsapp-float">💬</a>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbx2GHqfDnDkeVhlgCBZIjyE9EZB1AGEjJzgJ_WHEcHel1JWRp_J1zenEdq0ifkw-qb8/exec';
+<script>
+  const API_URL = 'https://script.google.com/macros/s/AKfycbx2GHqfDnDkeVhlgCBZIjyE9EZB1AGEjJzgJ_WHEcHel1JWRp_J1zenEdq0ifkw-qb8/exec';
 
-    // Store hours (will be set after loading vendor)
-    let storeHours = {
-      opening: null,
-      closing: null
+  // Store hours (will be set after loading vendor)
+  let storeHours = {
+    opening: null,
+    closing: null
+  };
+
+  // Generate 30-min pickup slots based on current time + prep rule
+  function generatePickupSlots() {
+    const now = new Date();
+    // Find max prep time in cart
+    let maxPrep = 60; // default
+    if (window.cart && window.cart.length > 0) {
+      const prepTimes = window.cart.map(item => {
+        return parseInt(storeHours.prepMinutes) || 60;
+      });
+      maxPrep = Math.max(...prepTimes);
+    }
+
+    const readyTime = new Date(now.getTime() + maxPrep * 60000);
+
+    // Round up to next 30-min mark
+    let start = new Date(readyTime);
+    const minutes = start.getMinutes();
+    if (minutes <= 30) {
+      start.setMinutes(30, 0, 0);
+    } else {
+      start.setHours(start.getHours() + 1, 0, 0, 0);
+    }
+
+    // Parse store hours
+    const openTime = parseTime(storeHours.opening || "08:30");
+    const closeTime = parseTime(storeHours.closing || "18:00");
+
+    // ✅ FIX: Create today's date for open/close times
+    const today = new Date();
+    const openDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), openTime.h, openTime.m, 0, 0);
+    const closeDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), closeTime.h, closeTime.m, 0, 0);
+
+    // If kitchen hasn't opened yet
+    if (now < openDate) {
+      return { error: "Orders start at " + storeHours.opening };
+    }
+
+    // If kitchen is already closed
+    if (now >= closeDate) {
+      return { error: "Kitchen is closed. Orders reopen tomorrow." };
+    }
+
+    const earliestSlot = new Date(Math.max(start, openDate));
+    if (earliestSlot >= closeDate) {
+      return { error: "Too late to order. Kitchen closes soon." };
+    }
+
+    const slots = [];
+    let current = new Date(earliestSlot);
+    while (current < closeDate) {
+      const end = new Date(current.getTime() + 30 * 60000);
+      if (end > closeDate) break;
+
+      const options = { hour: 'numeric', minute: '2-digit', hour12: true };
+      slots.push({
+        start: new Date(current),
+        end: new Date(end),
+        label: `${current.toLocaleTimeString([], options)} – ${end.toLocaleTimeString([], options)}`
+      });
+
+      current = end;
+      if (slots.length >= 5) break;
+    }
+
+    if (slots.length === 0) {
+      return { error: "No available pickup times." };
+    }
+
+    return { slots };
+  }
+
+  function parseTime(timeStr) {
+    const parts = timeStr.trim().split(':');
+    return {
+      h: parseInt(parts[0], 10),
+      m: parseInt(parts[1], 10) || 0
     };
+  }
 
-    // Generate 30-min pickup slots based on current time + prep rule
-    function generatePickupSlots() {
-      const now = new Date();
-      // Find max prep time in cart
-      let maxPrep = 60; // default
-      if (window.cart && window.cart.length > 0) {
-        const prepTimes = window.cart.map(item => {
-          // In real app, you'd fetch item prep time, but for now use vendor default
-          return parseInt(storeHours.prepMinutes) || 60;
-        });
-        maxPrep = Math.max(...prepTimes);
-      }
+  document.addEventListener('DOMContentLoaded', async function () {
+    const urlParams = new URLSearchParams(window.location.search);
+    const storeId = urlParams.get('storeId');
+    const from = urlParams.get('from');
+    const backButton = document.getElementById('back-btn');
 
-      const readyTime = new Date(now.getTime() + maxPrep * 60000);
-
-      // Round up to next 30-min mark
-      let start = new Date(readyTime);
-      const minutes = start.getMinutes();
-      if (minutes <= 30) {
-        start.setMinutes(30, 0, 0);
-      } else {
-        start.setHours(start.getHours() + 1, 0, 0, 0);
-      }
-
-      // Parse store hours
-      const openTime = parseTime(storeHours.opening || "08:30");
-      const closeTime = parseTime(storeHours.closing || "18:00");
-
-      const openDate = new Date();
-      openDate.setHours(openTime.h, openTime.m, 0, 0);
-      const closeDate = new Date();
-      closeDate.setHours(closeTime.h, closeTime.m, 0, 0);
-
-      if (now >= closeDate) {
-        return { error: "Kitchen is closed. Orders reopen tomorrow." };
-      }
-
-      const earliestSlot = new Date(Math.max(start, openDate));
-      if (earliestSlot >= closeDate) {
-        return { error: "Too late to order. Kitchen closes soon." };
-      }
-
-      const slots = [];
-      let current = new Date(earliestSlot);
-      while (current < closeDate) {
-        const end = new Date(current.getTime() + 30 * 60000);
-        if (end > closeDate) break;
-
-        const options = { hour: 'numeric', minute: '2-digit', hour12: true };
-        slots.push({
-          start: new Date(current),
-          end: new Date(end),
-          label: `${current.toLocaleTimeString([], options)} – ${end.toLocaleTimeString([], options)}`
-        });
-
-        current = end;
-        if (slots.length >= 5) break;
-      }
-
-      if (slots.length === 0) {
-        return { error: "No available pickup times." };
-      }
-
-      return { slots };
+    if (from === 'blouberg-eats') {
+      backButton.href = 'blouberg-eats.html';
+    } else if (from === 'mankweng-eats') {
+      backButton.href = 'mankweng-eats.html';
+    } else if (from === 'seshego-eats') {
+      backButton.href = 'seshego-eats.html';
+    } else {
+      backButton.href = 'index.html';
     }
 
-    function parseTime(timeStr) {
-      const parts = timeStr.trim().split(':');
-      return {
-        h: parseInt(parts[0], 10),
-        m: parseInt(parts[1], 10) || 0
-      };
+    if (!storeId) {
+      document.getElementById('store-name').textContent = 'Store not found';
+      return;
     }
 
-    document.addEventListener('DOMContentLoaded', async function () {
-      const urlParams = new URLSearchParams(window.location.search);
-      const storeId = urlParams.get('storeId');
-      const from = urlParams.get('from');
-      const backButton = document.getElementById('back-btn');
+    try {
+      const storeRes = await fetch(`${API_URL}?action=stores`);
+      const storeData = await storeRes.json();
+      if (!storeData.success) throw new Error('Failed to load stores');
 
-      if (from === 'blouberg-eats') {
-        backButton.href = 'blouberg-eats.html';
-      } else if (from === 'mankweng-eats') {
-        backButton.href = 'mankweng-eats.html';
-      } else if (from === 'seshego-eats') {
-        backButton.href = 'seshego-eats.html';
-      } else {
-        backButton.href = 'index.html';
-      }
-
-      if (!storeId) {
+      const store = storeData.data.find(s => s.Store_ID === storeId);
+      if (!store) {
         document.getElementById('store-name').textContent = 'Store not found';
         return;
       }
 
-      try {
-        const storeRes = await fetch(`${API_URL}?action=stores`);
-        const storeData = await storeRes.json();
-        if (!storeData.success) throw new Error('Failed to load stores');
+      document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
+      document.getElementById('store-slogan').textContent = store.Slogan || '';
+      document.body.dataset.waNumber = store.WhatsApp || '27726515909';
+      
+      const primaryColor = store.Primary_Color || '#ff0000';
+      document.documentElement.style.setProperty('--brand-red', primaryColor);
 
-        const store = storeData.data.find(s => s.Store_ID === storeId);
-        if (!store) {
-          document.getElementById('store-name').textContent = 'Store not found';
-          return;
-        }
+      storeHours.opening = store.Opening_Time || "08:30";
+      storeHours.closing = store.Closing_Time || "18:00";
+      storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
 
-        document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
-        document.getElementById('store-slogan').textContent = store.Slogan || '';
-        document.body.dataset.waNumber = store.WhatsApp || '27726515909';
-        
-        const primaryColor = store.Primary_Color || '#ff0000';
-        document.documentElement.style.setProperty('--brand-red', primaryColor);
+      const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
+      const menuData = await menuRes.json();
+      if (!menuData.success) throw new Error('Failed to load menu');
 
-        storeHours.opening = store.Opening_Time || "08:30";
-        storeHours.closing = store.Closing_Time || "18:00";
-        storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
+      const menuContainer = document.getElementById('menu-container');
+      if (menuData.data.length === 0) {
+        menuContainer.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">Menu coming soon!</p></div>`;
+        return;
+      }
 
-        const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
-        const menuData = await menuRes.json();
-        if (!menuData.success) throw new Error('Failed to load menu');
-
-        const menuContainer = document.getElementById('menu-container');
-        if (menuData.data.length === 0) {
-          menuContainer.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">Menu coming soon!</p></div>`;
-          return;
-        }
-
-        let menuHtml = '';
-        menuData.data.forEach(item => {
-          menuHtml += `
-            <div class="col-6 col-md-3">
-              <div class="menu-item bg-white rounded-3 shadow-sm p-3 text-center h-100"
-                   data-id="${item.Item_ID}" 
-                   data-name="${item.Item_Name}" 
-                   data-price="${item.Price}"
-                   data-description="${item.Description || 'Delicious meal'}">
-                <img src="${item.Image_URL || 'assets/images/image.webp'}" 
-                     class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
-                <h6 class="fw-bold">${item.Item_Name}</h6>
-                <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
-                <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
-                <button class="btn btn-sm w-100 btn-add mt-2" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
-              </div>
+      let menuHtml = '';
+      menuData.data.forEach(item => {
+        menuHtml += `
+          <div class="col-6 col-md-3">
+            <div class="menu-item bg-white rounded-3 shadow-sm p-3 text-center h-100"
+                 data-id="${item.Item_ID}" 
+                 data-name="${item.Item_Name}" 
+                 data-price="${item.Price}"
+                 data-description="${item.Description || 'Delicious meal'}">
+              <img src="${item.Image_URL || 'assets/images/image.webp'}" 
+                   class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
+              <h6 class="fw-bold">${item.Item_Name}</h6>
+              <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
+              <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
+              <button class="btn btn-sm w-100 btn-add mt-2" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
             </div>
-          `;
+          </div>
+        `;
+      });
+      menuContainer.innerHTML = menuHtml;
+
+      // Initialize cart
+      let cart = [];
+      window.cart = cart;
+
+      const cartCountEl = document.getElementById('cart-count');
+      const cartTotalEl = document.getElementById('cart-total');
+      const cartSummary = document.getElementById('cart-summary');
+      const cartDrawer = document.getElementById('cart-drawer');
+      const cartOverlay = document.getElementById('modal-overlay');
+      const cartItemsList = document.getElementById('cart-items-list');
+
+      function updateCartUI() {
+        const count = cart.reduce((sum, item) => sum + item.qty, 0);
+        const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        cartCountEl.textContent = count;
+        cartTotalEl.textContent = `R${total.toFixed(2)}`;
+
+        if (count === 0) {
+          cartItemsList.innerHTML = '<p class="text-muted">Your basket is empty.</p>';
+        } else {
+          let html = '';
+          cart.forEach(item => {
+            html += `
+              <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                <div>
+                  <strong>${item.name}</strong><br>
+                  <small class="text-muted">R${item.price} × ${item.qty}</small>
+                </div>
+                <div>
+                  <button class="btn btn-sm btn-outline-danger remove-item" data-id="${item.id}">✕</button>
+                </div>
+              </div>
+            `;
+          });
+          cartItemsList.innerHTML = html;
+
+          document.querySelectorAll('.remove-item').forEach(btn => {
+            btn.addEventListener('click', function() {
+              const id = this.dataset.id;
+              const index = cart.findIndex(i => i.id === id);
+              if (index > -1) {
+                if (cart[index].qty > 1) {
+                  cart[index].qty--;
+                } else {
+                  cart.splice(index, 1);
+                }
+                updateCartUI();
+              }
+            });
+          });
+        }
+      }
+
+      // View Details Modal
+      document.querySelectorAll('.view-details').forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const itemDiv = this.closest('.menu-item');
+          document.getElementById('detail-name').textContent = itemDiv.dataset.name;
+          document.getElementById('detail-price').textContent = `R${itemDiv.dataset.price}`;
+          document.getElementById('detail-description').textContent = itemDiv.dataset.description;
+          document.getElementById('item-detail-modal').style.display = 'flex';
         });
-        menuContainer.innerHTML = menuHtml;
+      });
 
-        // Initialize cart
-        let cart = [];
-        window.cart = cart; // expose for pickup logic
+      document.getElementById('close-detail').addEventListener('click', function() {
+        document.getElementById('item-detail-modal').style.display = 'none';
+      });
 
-        const cartCountEl = document.getElementById('cart-count');
-        const cartTotalEl = document.getElementById('cart-total');
-        const cartSummary = document.getElementById('cart-summary');
-        const cartDrawer = document.getElementById('cart-drawer');
-        const cartOverlay = document.getElementById('modal-overlay');
-        const cartItemsList = document.getElementById('cart-items-list');
+      document.querySelectorAll('.btn-add').forEach(button => {
+        button.addEventListener('click', function() {
+          const item = this.closest('.menu-item');
+          const id = item.dataset.id;
+          const name = item.dataset.name;
+          const price = parseFloat(item.dataset.price);
 
-        function updateCartUI() {
-          const count = cart.reduce((sum, item) => sum + item.qty, 0);
-          const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-          cartCountEl.textContent = count;
-          cartTotalEl.textContent = `R${total.toFixed(2)}`;
-
-          if (count === 0) {
-            cartItemsList.innerHTML = '<p class="text-muted">Your basket is empty.</p>';
+          const existing = cart.find(i => i.id === id);
+          if (existing) {
+            existing.qty++;
           } else {
-            let html = '';
-            cart.forEach(item => {
-              html += `
-                <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
-                  <div>
-                    <strong>${item.name}</strong><br>
-                    <small class="text-muted">R${item.price} × ${item.qty}</small>
-                  </div>
-                  <div>
-                    <button class="btn btn-sm btn-outline-danger remove-item" data-id="${item.id}">✕</button>
-                  </div>
+            cart.push({ id, name, price, qty: 1 });
+          }
+          updateCartUI();
+        });
+      });
+
+      cartSummary.addEventListener('click', function() {
+        cartDrawer.classList.add('active');
+        cartOverlay.classList.add('active');
+      });
+
+      document.getElementById('close-cart').addEventListener('click', function() {
+        cartDrawer.classList.remove('active');
+        cartOverlay.classList.remove('active');
+      });
+
+      cartOverlay.addEventListener('click', function() {
+        cartDrawer.classList.remove('active');
+        cartOverlay.classList.remove('active');
+      });
+
+      // ✅ PICKUP-ONLY CHECKOUT FLOW
+      document.getElementById('checkout-btn').addEventListener('click', function() {
+        if (cart.length === 0) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'pickup-modal';
+        modal.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.7); z-index: 2001; display: flex;
+          align-items: center; justify-content: center;
+        `;
+        modal.innerHTML = `
+          <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
+            <h4 class="mb-3">Choose Pickup Time</h4>
+            <p class="time-note">Kitchens need time to prepare your order. Pickup slots start from the next available window.</p>
+            <div id="time-slots" class="mt-3"></div>
+            <button class="btn btn-secondary w-100 mt-3 py-2" id="close-pickup-modal">Cancel</button>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        const { slots, error } = generatePickupSlots();
+        const timeSlotsDiv = document.getElementById('time-slots');
+        
+        if (error) {
+          timeSlotsDiv.innerHTML = `<p class="text-danger">${error}</p>`;
+        } else {
+          let slotsHtml = '';
+          slots.forEach(slot => {
+            slotsHtml += `<button class="btn btn-outline-dark w-100 mb-2 py-2 pickup-slot" data-time="${slot.label}">${slot.label}</button>`;
+          });
+          timeSlotsDiv.innerHTML = slotsHtml;
+
+          document.querySelectorAll('.pickup-slot').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const selectedTime = btn.dataset.time;
+              // Show name input
+              modal.innerHTML = `
+                <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
+                  <h4 class="mb-3">What's your name?</h4>
+                  <p class="text-muted mb-3">We'll put this on your order (e.g., "Thabo")</p>
+                  <input type="text" id="customer-name" class="form-control mb-3" placeholder="First name only" maxlength="20">
+                  <button class="btn btn-success w-100 mb-2 py-3" id="confirm-name">Confirm & Send Order</button>
+                  <button class="btn btn-secondary w-100 py-2" id="back-to-time">← Back to Time</button>
                 </div>
               `;
-            });
-            cartItemsList.innerHTML = html;
-
-            document.querySelectorAll('.remove-item').forEach(btn => {
-              btn.addEventListener('click', function() {
-                const id = this.dataset.id;
-                const index = cart.findIndex(i => i.id === id);
-                if (index > -1) {
-                  if (cart[index].qty > 1) {
-                    cart[index].qty--;
-                  } else {
-                    cart.splice(index, 1);
-                  }
-                  updateCartUI();
+              document.getElementById('back-to-time').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                document.getElementById('checkout-btn').click();
+              });
+              document.getElementById('confirm-name').addEventListener('click', () => {
+                const name = document.getElementById('customer-name').value.trim();
+                if (!name) {
+                  alert("Please enter your name.");
+                  return;
                 }
+                sendOrder(name, selectedTime);
+                document.body.removeChild(modal);
+                cartDrawer.classList.remove('active');
+                cartOverlay.classList.remove('active');
               });
             });
-          }
+          });
         }
 
-        // View Details Modal
-        document.querySelectorAll('.view-details').forEach(link => {
-          link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const itemDiv = this.closest('.menu-item');
-            document.getElementById('detail-name').textContent = itemDiv.dataset.name;
-            document.getElementById('detail-price').textContent = `R${itemDiv.dataset.price}`;
-            document.getElementById('detail-description').textContent = itemDiv.dataset.description;
-            document.getElementById('item-detail-modal').style.display = 'flex';
-          });
+        document.getElementById('close-pickup-modal').addEventListener('click', () => {
+          document.body.removeChild(modal);
         });
+      });
 
-        document.getElementById('close-detail').addEventListener('click', function() {
-          document.getElementById('item-detail-modal').style.display = 'none';
-        });
-
-        document.querySelectorAll('.btn-add').forEach(button => {
-          button.addEventListener('click', function() {
-            const item = this.closest('.menu-item');
-            const id = item.dataset.id;
-            const name = item.dataset.name;
-            const price = parseFloat(item.dataset.price);
-
-            const existing = cart.find(i => i.id === id);
-            if (existing) {
-              existing.qty++;
-            } else {
-              cart.push({ id, name, price, qty: 1 });
-            }
-            updateCartUI();
-          });
-        });
-
-        cartSummary.addEventListener('click', function() {
-          cartDrawer.classList.add('active');
-          cartOverlay.classList.add('active');
-        });
-
-        document.getElementById('close-cart').addEventListener('click', function() {
-          cartDrawer.classList.remove('active');
-          cartOverlay.classList.remove('active');
-        });
-
-        cartOverlay.addEventListener('click', function() {
-          cartDrawer.classList.remove('active');
-          cartOverlay.classList.remove('active');
-        });
-
-        // ✅ PICKUP-ONLY CHECKOUT FLOW
-        document.getElementById('checkout-btn').addEventListener('click', function() {
-          if (cart.length === 0) return;
-
-          const modal = document.createElement('div');
-          modal.id = 'pickup-modal';
-          modal.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); z-index: 2001; display: flex;
-            align-items: center; justify-content: center;
-          `;
-          modal.innerHTML = `
-            <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
-              <h4 class="mb-3">Choose Pickup Time</h4>
-              <p class="time-note">Kitchens need time to prepare your order. Pickup slots start from the next available window.</p>
-              <div id="time-slots" class="mt-3"></div>
-              <button class="btn btn-secondary w-100 mt-3 py-2" id="close-pickup-modal">Cancel</button>
-            </div>
-          `;
-          document.body.appendChild(modal);
-
-          const { slots, error } = generatePickupSlots();
-          const timeSlotsDiv = document.getElementById('time-slots');
-          
-          if (error) {
-            timeSlotsDiv.innerHTML = `<p class="text-danger">${error}</p>`;
-          } else {
-            let slotsHtml = '';
-            slots.forEach(slot => {
-              slotsHtml += `<button class="btn btn-outline-dark w-100 mb-2 py-2 pickup-slot" data-time="${slot.label}">${slot.label}</button>`;
-            });
-            timeSlotsDiv.innerHTML = slotsHtml;
-
-            document.querySelectorAll('.pickup-slot').forEach(btn => {
-              btn.addEventListener('click', () => {
-                const selectedTime = btn.dataset.time;
-                // Show name input
-                modal.innerHTML = `
-                  <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
-                    <h4 class="mb-3">What's your name?</h4>
-                    <p class="text-muted mb-3">We'll put this on your order (e.g., "Thabo")</p>
-                    <input type="text" id="customer-name" class="form-control mb-3" placeholder="First name only" maxlength="20">
-                    <button class="btn btn-success w-100 mb-2 py-3" id="confirm-name">Confirm & Send Order</button>
-                    <button class="btn btn-secondary w-100 py-2" id="back-to-time">← Back to Time</button>
-                  </div>
-                `;
-                document.getElementById('back-to-time').addEventListener('click', () => {
-                  modal.querySelector('#pickup-modal')?.remove();
-                  document.getElementById('checkout-btn').click(); // re-open time modal
-                });
-                document.getElementById('confirm-name').addEventListener('click', () => {
-                  const name = document.getElementById('customer-name').value.trim();
-                  if (!name) {
-                    alert("Please enter your name.");
-                    return;
-                  }
-                  sendOrder(name, selectedTime);
-                  document.body.removeChild(modal);
-                  cartDrawer.classList.remove('active');
-                  cartOverlay.classList.remove('active');
-                });
-              });
-            });
-          }
-
-          document.getElementById('close-pickup-modal').addEventListener('click', () => {
-            document.body.removeChild(modal);
-          });
-        });
-
-        function sendOrder(customerName, pickupTime) {
-          const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
-          const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-          
-          let msg = `ORDER FOR: ${customerName}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${pickupTime}`;
-          const waNumber = document.body.dataset.waNumber;
-          window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-        }
-
-      } catch (error) {
-        console.error('Error loading store:', error);
-        document.getElementById('store-name').textContent = 'Error loading store';
-        document.getElementById('menu-container').innerHTML = `<div class="col-12 text-center py-5"><p class="text-danger">Failed to load menu.</p></div>`;
+      function sendOrder(customerName, pickupTime) {
+        const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
+        const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+        
+        let msg = `ORDER FOR: ${customerName}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${pickupTime}`;
+        const waNumber = document.body.dataset.waNumber;
+        window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
       }
-    });
-  </script>
+
+    } catch (error) {
+      console.error('Error loading store:', error);
+      document.getElementById('store-name').textContent = 'Error loading store';
+      document.getElementById('menu-container').innerHTML = `<div class="col-12 text-center py-5"><p class="text-danger">Failed to load menu.</p></div>`;
+    }
+  });
+</script>
 </body>
 </html>
