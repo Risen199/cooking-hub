@@ -133,9 +133,44 @@
       margin-top: 8px;
       text-align: center;
     }
+    /* Modal for item details */
+    #item-detail-modal {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      z-index: 3000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+    }
+    .view-details {
+      display: block;
+      margin-top: 8px;
+      color: var(--brand-red);
+      font-size: 0.875rem;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body data-wa-number="27726515909">
+
+  <!-- Item Detail Modal -->
+  <div id="item-detail-modal">
+    <div class="modal-content">
+      <h4 id="detail-name"></h4>
+      <p class="fw-bold fs-5" style="color: var(--brand-red);" id="detail-price"></p>
+      <p id="detail-description"></p>
+      <button class="btn btn-secondary mt-3" id="close-detail">Close</button>
+    </div>
+  </div>
 
   <div class="cart-overlay" id="modal-overlay"></div>
 
@@ -222,10 +257,20 @@
     // Generate 30-min pickup slots based on current time + prep rule
     function generatePickupSlots() {
       const now = new Date();
-      const oneHourLater = new Date(now.getTime() + 60 * 60000);
+      // Find max prep time in cart
+      let maxPrep = 60; // default
+      if (window.cart && window.cart.length > 0) {
+        const prepTimes = window.cart.map(item => {
+          // In real app, you'd fetch item prep time, but for now use vendor default
+          return parseInt(storeHours.prepMinutes) || 60;
+        });
+        maxPrep = Math.max(...prepTimes);
+      }
+
+      const readyTime = new Date(now.getTime() + maxPrep * 60000);
 
       // Round up to next 30-min mark
-      let start = new Date(oneHourLater);
+      let start = new Date(readyTime);
       const minutes = start.getMinutes();
       if (minutes <= 30) {
         start.setMinutes(30, 0, 0);
@@ -233,7 +278,7 @@
         start.setHours(start.getHours() + 1, 0, 0, 0);
       }
 
-      // Parse store hours (from Google Sheets)
+      // Parse store hours
       const openTime = parseTime(storeHours.opening || "08:30");
       const closeTime = parseTime(storeHours.closing || "18:00");
 
@@ -242,18 +287,15 @@
       const closeDate = new Date();
       closeDate.setHours(closeTime.h, closeTime.m, 0, 0);
 
-      // If it's past closing, no slots
       if (now >= closeDate) {
         return { error: "Kitchen is closed. Orders reopen tomorrow." };
       }
 
-      // Earliest slot must be after opening + 1h prep
       const earliestSlot = new Date(Math.max(start, openDate));
       if (earliestSlot >= closeDate) {
         return { error: "Too late to order. Kitchen closes soon." };
       }
 
-      // Generate 30-min slots up to closing time
       const slots = [];
       let current = new Date(earliestSlot);
       while (current < closeDate) {
@@ -268,7 +310,6 @@
         });
 
         current = end;
-        // Limit to ~5 slots to avoid overload
         if (slots.length >= 5) break;
       }
 
@@ -276,11 +317,10 @@
         return { error: "No available pickup times." };
       }
 
-      return { slots, firstSlot: slots[0].start };
+      return { slots };
     }
 
     function parseTime(timeStr) {
-      // Accepts "08:30" or "8:30"
       const parts = timeStr.trim().split(':');
       return {
         h: parseInt(parts[0], 10),
@@ -327,9 +367,9 @@
         const primaryColor = store.Primary_Color || '#ff0000';
         document.documentElement.style.setProperty('--brand-red', primaryColor);
 
-        // ✅ Load store hours from Google Sheets
         storeHours.opening = store.Opening_Time || "08:30";
         storeHours.closing = store.Closing_Time || "18:00";
+        storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
 
         const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
         const menuData = await menuRes.json();
@@ -346,12 +386,16 @@
           menuHtml += `
             <div class="col-6 col-md-3">
               <div class="menu-item bg-white rounded-3 shadow-sm p-3 text-center h-100"
-                   data-id="${item.Item_ID}" data-name="${item.Item_Name}" data-price="${item.Price}">
+                   data-id="${item.Item_ID}" 
+                   data-name="${item.Item_Name}" 
+                   data-price="${item.Price}"
+                   data-description="${item.Description || 'Delicious meal'}">
                 <img src="${item.Image_URL || 'assets/images/image.webp'}" 
                      class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
                 <h6 class="fw-bold">${item.Item_Name}</h6>
                 <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
-                <button class="btn btn-sm w-100 btn-add" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
+                <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
+                <button class="btn btn-sm w-100 btn-add mt-2" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
               </div>
             </div>
           `;
@@ -360,6 +404,8 @@
 
         // Initialize cart
         let cart = [];
+        window.cart = cart; // expose for pickup logic
+
         const cartCountEl = document.getElementById('cart-count');
         const cartTotalEl = document.getElementById('cart-total');
         const cartSummary = document.getElementById('cart-summary');
@@ -409,6 +455,22 @@
           }
         }
 
+        // View Details Modal
+        document.querySelectorAll('.view-details').forEach(link => {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const itemDiv = this.closest('.menu-item');
+            document.getElementById('detail-name').textContent = itemDiv.dataset.name;
+            document.getElementById('detail-price').textContent = `R${itemDiv.dataset.price}`;
+            document.getElementById('detail-description').textContent = itemDiv.dataset.description;
+            document.getElementById('item-detail-modal').style.display = 'flex';
+          });
+        });
+
+        document.getElementById('close-detail').addEventListener('click', function() {
+          document.getElementById('item-detail-modal').style.display = 'none';
+        });
+
         document.querySelectorAll('.btn-add').forEach(button => {
           button.addEventListener('click', function() {
             const item = this.closest('.menu-item');
@@ -441,12 +503,12 @@
           cartOverlay.classList.remove('active');
         });
 
-        // ✅ NEW CHECKOUT FLOW WITH TIME SELECTION
+        // ✅ PICKUP-ONLY CHECKOUT FLOW
         document.getElementById('checkout-btn').addEventListener('click', function() {
           if (cart.length === 0) return;
 
           const modal = document.createElement('div');
-          modal.id = 'delivery-modal';
+          modal.id = 'pickup-modal';
           modal.style.cssText = `
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.7); z-index: 2001; display: flex;
@@ -454,130 +516,68 @@
           `;
           modal.innerHTML = `
             <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
-              <div id="delivery-options">
-                <h4 class="mb-3">How would you like to receive your order?</h4>
-                <button class="btn btn-outline-primary w-100 mb-3 py-3" id="opt-collection">I'll collect from the kitchen</button>
-                <button class="btn btn-outline-success w-100 mb-3 py-3" id="opt-delivery">Deliver to me</button>
-                <button class="btn btn-secondary w-100 py-2" id="close-delivery-modal">Cancel</button>
-              </div>
-              <div id="pickup-time-selector" class="hidden">
-                <h4 class="mb-3">Choose Pickup Time</h4>
-                <p class="time-note">Kitchens need 1 hour to prepare your order. Pickup slots start from the next available window.</p>
-                <div id="time-slots" class="mt-3"></div>
-                <button class="btn btn-secondary w-100 mt-3 py-2" id="back-to-delivery">← Back</button>
-              </div>
-              <div id="delivery-form" class="hidden">
-                <h4 class="mb-3">Delivery Details</h4>
-                <input type="text" id="delivery-area" class="form-control mb-2" placeholder="Area (e.g., Zone 2, Broekman)">
-                <input type="text" id="delivery-street" class="form-control mb-3" placeholder="Street/Landmark (e.g., Near Spaza)">
-                <div class="form-check mb-3">
-                  <input class="form-check-input" type="checkbox" id="share-location">
-                  <label class="form-check-label" for="share-location">
-                    I'll share my live location on WhatsApp for better delivery
-                  </label>
-                </div>
-                <button class="btn btn-success w-100 mb-2 py-3" id="confirm-delivery">Confirm Delivery</button>
-                <button class="btn btn-secondary w-100 py-2" id="back-to-delivery2">← Back</button>
-              </div>
+              <h4 class="mb-3">Choose Pickup Time</h4>
+              <p class="time-note">Kitchens need time to prepare your order. Pickup slots start from the next available window.</p>
+              <div id="time-slots" class="mt-3"></div>
+              <button class="btn btn-secondary w-100 mt-3 py-2" id="close-pickup-modal">Cancel</button>
             </div>
           `;
           document.body.appendChild(modal);
 
-          // Show delivery options
-          function showOptions() {
-            document.getElementById('delivery-options').classList.remove('hidden');
-            document.getElementById('pickup-time-selector').classList.add('hidden');
-            document.getElementById('delivery-form').classList.add('hidden');
-          }
-
-          // Show pickup time selector
-          function showPickupSelector() {
-            const { slots, error } = generatePickupSlots();
-            const timeSlotsDiv = document.getElementById('time-slots');
-            
-            if (error) {
-              timeSlotsDiv.innerHTML = `<p class="text-danger">${error}</p>`;
-              return;
-            }
-
+          const { slots, error } = generatePickupSlots();
+          const timeSlotsDiv = document.getElementById('time-slots');
+          
+          if (error) {
+            timeSlotsDiv.innerHTML = `<p class="text-danger">${error}</p>`;
+          } else {
             let slotsHtml = '';
             slots.forEach(slot => {
-              slotsHtml += `<button class="btn btn-outline-dark w-100 mb-2 py-2 pickup-slot" data-start="${slot.start.toISOString()}">${slot.label}</button>`;
+              slotsHtml += `<button class="btn btn-outline-dark w-100 mb-2 py-2 pickup-slot" data-time="${slot.label}">${slot.label}</button>`;
             });
             timeSlotsDiv.innerHTML = slotsHtml;
 
             document.querySelectorAll('.pickup-slot').forEach(btn => {
               btn.addEventListener('click', () => {
-                const selectedTime = btn.textContent;
-                sendOrder('Collection', '', selectedTime);
-                document.body.removeChild(modal);
-                cartDrawer.classList.remove('active');
-                cartOverlay.classList.remove('active');
+                const selectedTime = btn.dataset.time;
+                // Show name input
+                modal.innerHTML = `
+                  <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
+                    <h4 class="mb-3">What's your name?</h4>
+                    <p class="text-muted mb-3">We'll put this on your order (e.g., "Thabo")</p>
+                    <input type="text" id="customer-name" class="form-control mb-3" placeholder="First name only" maxlength="20">
+                    <button class="btn btn-success w-100 mb-2 py-3" id="confirm-name">Confirm & Send Order</button>
+                    <button class="btn btn-secondary w-100 py-2" id="back-to-time">← Back to Time</button>
+                  </div>
+                `;
+                document.getElementById('back-to-time').addEventListener('click', () => {
+                  modal.querySelector('#pickup-modal')?.remove();
+                  document.getElementById('checkout-btn').click(); // re-open time modal
+                });
+                document.getElementById('confirm-name').addEventListener('click', () => {
+                  const name = document.getElementById('customer-name').value.trim();
+                  if (!name) {
+                    alert("Please enter your name.");
+                    return;
+                  }
+                  sendOrder(name, selectedTime);
+                  document.body.removeChild(modal);
+                  cartDrawer.classList.remove('active');
+                  cartOverlay.classList.remove('active');
+                });
               });
             });
-
-            document.getElementById('delivery-options').classList.add('hidden');
-            document.getElementById('pickup-time-selector').classList.remove('hidden');
           }
 
-          // Handle collection
-          modal.querySelector('#opt-collection').addEventListener('click', showPickupSelector);
-          
-          // Handle delivery
-          modal.querySelector('#opt-delivery').addEventListener('click', () => {
-            document.getElementById('delivery-options').classList.add('hidden');
-            document.getElementById('delivery-form').classList.remove('hidden');
-          });
-
-          // Back buttons
-          modal.querySelector('#back-to-delivery').addEventListener('click', showOptions);
-          modal.querySelector('#back-to-delivery2').addEventListener('click', showOptions);
-
-          // Confirm delivery
-          modal.querySelector('#confirm-delivery').addEventListener('click', () => {
-            const area = document.getElementById('delivery-area').value.trim();
-            const street = document.getElementById('delivery-street').value.trim();
-            const shareLoc = document.getElementById('share-location').checked;
-            
-            let deliveryNote = '';
-            if (area || street) {
-              deliveryNote = `Delivery: ${area} ${street}`.trim();
-            }
-            if (shareLoc) {
-              deliveryNote += '\n\nI will share my live location on WhatsApp once you confirm!';
-            }
-            sendOrder('Delivery', deliveryNote, '');
-            document.body.removeChild(modal);
-            cartDrawer.classList.remove('active');
-            cartOverlay.classList.remove('active');
-          });
-
-          // Close modal
-          modal.querySelector('#close-delivery-modal').addEventListener('click', () => {
+          document.getElementById('close-pickup-modal').addEventListener('click', () => {
             document.body.removeChild(modal);
           });
         });
 
-        // Send order with optional pickup time
-        function sendOrder(deliveryType, deliveryNote, pickupTime = '') {
+        function sendOrder(customerName, pickupTime) {
           const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
           const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
           
-          let msg = `Hi! I'd like to place an order:\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}`;
-          
-          if (pickupTime) {
-            msg += `\n\nPickup window: ${pickupTime}`;
-          } else if (deliveryType === 'Collection') {
-            // Fallback (shouldn't happen)
-            msg += `\n\nI'll collect from your kitchen.`;
-          }
-
-          if (deliveryType === 'Delivery' && deliveryNote) {
-            msg += `\n\n${deliveryNote}`;
-          } else if (deliveryType === 'Collection' && !pickupTime) {
-            msg += `\n\nI'll collect from your kitchen.`;
-          }
-
+          let msg = `ORDER FOR: ${customerName}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${pickupTime}`;
           const waNumber = document.body.dataset.waNumber;
           window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
         }

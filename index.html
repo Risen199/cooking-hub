@@ -154,7 +154,7 @@
         />
       </div>
 
-      <button class="btn btn-schedule" id="schedule-delivery">SCHEDULE DELIVERY</button>
+      <button class="btn btn-schedule" id="schedule-delivery">See When You Can Pick Up Your Order</button>
       <button class="btn btn-glow" id="order-now">ORDER NOW</button>
 
       <div id="result-message" style="display:none;"></div>
@@ -184,148 +184,161 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-  // Full area-to-township mapping
-  const TOWNSHIP_MAP = {
-    // Blouberg
-    'senwabarwana': 'blouberg-eats.html',
-    'dilaeneng': 'blouberg-eats.html',
-    'mashalane': 'blouberg-eats.html',
-    'bochum': 'blouberg-eats.html',
-    'maokeng': 'blouberg-eats.html',
-    'extension 5': 'blouberg-eats.html',
-    'desmond park': 'blouberg-eats.html',
-    'broekman': 'blouberg-eats.html',
-    'blouberg': 'blouberg-eats.html',
-    // Seshego
-    'zone 1': 'seshego-eats.html',
-    'zone 2': 'seshego-eats.html',
-    'zone 3': 'seshego-eats.html',
-    'circle centre': 'seshego-eats.html',
-    'seshego': 'seshego-eats.html',
-    // Mankweng
-    'gate 1': 'mankweng-eats.html',
-    'gate 2': 'mankweng-eats.html',
-    'gate 3': 'mankweng-eats.html',
-    'hwiti': 'mankweng-eats.html',
-    'campus': 'mankweng-eats.html',
-    'mankweng': 'mankweng-eats.html'
-  };
+// Full area-to-township mapping
+const TOWNSHIP_MAP = {
+  // Blouberg
+  'senwabarwana': 'blouberg-eats.html',
+  'dilaeneng': 'blouberg-eats.html',
+  'mashalane': 'blouberg-eats.html',
+  'bochum': 'blouberg-eats.html',
+  'maokeng': 'blouberg-eats.html',
+  'extension 5': 'blouberg-eats.html',
+  'desmond park': 'blouberg-eats.html',
+  'broekman': 'blouberg-eats.html',
+  'blouberg': 'blouberg-eats.html',
+  // Seshego
+  'zone 1': 'seshego-eats.html',
+  'zone 2': 'seshego-eats.html',
+  'zone 3': 'seshego-eats.html',
+  'circle centre': 'seshego-eats.html',
+  'seshego': 'seshego-eats.html',
+  // Mankweng
+  'gate 1': 'mankweng-eats.html',
+  'gate 2': 'mankweng-eats.html',
+  'gate 3': 'mankweng-eats.html',
+  'hwiti': 'mankweng-eats.html',
+  'campus': 'mankweng-eats.html',
+  'mankweng': 'mankweng-eats.html'
+};
 
-  const searchInput = document.getElementById('location-search');
-  const orderNowBtn = document.getElementById('order-now');
-  const scheduleBtn = document.getElementById('schedule-delivery');
-  const resultDiv = document.getElementById('result-message');
-  const API_URL = 'https://script.google.com/macros/s/AKfycbx2GHqfDnDkeVhlgCBZIjyE9EZB1AGEjJzgJ_WHEcHel1JWRp_J1zenEdq0ifkw-qb8/exec';
+const searchInput = document.getElementById('location-search');
+const orderNowBtn = document.getElementById('order-now');
+const scheduleBtn = document.getElementById('schedule-delivery');
+const resultDiv = document.getElementById('result-message');
+const API_URL = 'https://script.google.com/macros/s/AKfycbx2GHqfDnDkeVhlgCBZIjyE9EZB1AGEjJzgJ_WHEcHel1JWRp_J1zenEdq0ifkw-qb8/exec';
 
-  function normalizeArea(area) {
-    return area.trim().toLowerCase();
+function normalizeArea(area) {
+  return area.trim().toLowerCase();
+}
+
+function getTownshipPage(area) {
+  return TOWNSHIP_MAP[normalizeArea(area)];
+}
+
+function logToHeatmap(searchTerm) {
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'heatmap',
+      data: { Search_Term: searchTerm }
+    })
+  }).catch(err => console.warn('Heatmap log failed:', err));
+}
+
+function showResult(message, isError = false) {
+  resultDiv.textContent = message;
+  resultDiv.className = isError ? 'coming-soon' : '';
+  resultDiv.style.display = 'block';
+}
+
+// ✅ NEW: Generate pickup time slots (1-hour rigid rule)
+function generatePickupSlots() {
+  const now = new Date();
+  const open = new Date();
+  open.setHours(8, 30, 0, 0);
+  const close = new Date();
+  close.setHours(20, 0, 0, 0); // 8:00 PM
+
+  if (now < open) {
+    return { valid: false, message: "Orders start at 8:30 AM" };
+  }
+  if (now >= close) {
+    return { valid: false, message: "Orders start at 8:30 AM" };
   }
 
-  function getTownshipPage(area) {
-    return TOWNSHIP_MAP[normalizeArea(area)];
+  // Add 60 minutes prep
+  let ready = new Date(now.getTime() + 60 * 60000);
+  // Round up to next 30-min mark
+  const minutes = ready.getMinutes();
+  if (minutes <= 30) {
+    ready.setMinutes(30, 0, 0);
+  } else {
+    ready.setHours(ready.getHours() + 1, 0, 0, 0);
   }
 
-  function logToHeatmap(searchTerm) {
-    fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'heatmap',
-        data: { Search_Term: searchTerm }
-      })
-    }).catch(err => console.warn('Heatmap log failed:', err));
-  }
-
-  function showResult(message, isError = false) {
-    resultDiv.textContent = message;
-    resultDiv.className = isError ? 'coming-soon' : '';
-    resultDiv.style.display = 'block';
-  }
-
-  // Calculate ready time (current time + 60 minutes)
-  function calculateReadyTime() {
-    const now = new Date();
-    const prepMinutes = 60;
-    const readyTime = new Date(now.getTime() + prepMinutes * 60000);
-    
-    // Operating hours: 8:30 AM – 6:00 PM
-    const openHour = 8;
-    const openMinute = 30;
-    const closeHour = 18;
-    const closeMinute = 0;
-
-    const open = new Date();
-    open.setHours(openHour, openMinute, 0, 0);
-    const close = new Date();
-    close.setHours(closeHour, closeMinute, 0, 0);
-
-    if (readyTime > close) {
-      return { valid: false, message: "Last order! Ready by 6:00 PM" };
-    }
-    if (now < open) {
-      return { valid: false, message: "Orders start at 8:30 AM" };
-    }
-
-    // Format as "10:30 AM"
+  // Generate 4 slots (2 hours of windows)
+  const slots = [];
+  let current = new Date(ready);
+  for (let i = 0; i < 4; i++) {
+    const end = new Date(current.getTime() + 30 * 60000);
     const options = { hour: 'numeric', minute: '2-digit', hour12: true };
-    const timeStr = readyTime.toLocaleTimeString([], options);
-    return { valid: true, message: `Ready by ${timeStr}` };
+    slots.push(`${current.toLocaleTimeString([], options)} – ${end.toLocaleTimeString([], options)}`);
+    current = end;
   }
 
-  function handleOrderNow() {
-    const rawArea = searchInput.value;
-    if (!rawArea.trim()) {
-      showResult('Please enter your area.', true);
-      return;
-    }
+  return { valid: true, slots };
+}
 
-    const page = getTownshipPage(rawArea);
-    if (page) {
-      sessionStorage.removeItem('deliveryMode');
-      window.location.href = page;
-    } else {
-      showResult(`Coming soon to ${rawArea}!`, true);
-      logToHeatmap(rawArea);
-    }
+function handleOrderNow() {
+  const rawArea = searchInput.value;
+  if (!rawArea.trim()) {
+    showResult('Please enter your area.', true);
+    return;
   }
 
-  function handleScheduleDelivery() {
-    const rawArea = searchInput.value;
-    if (!rawArea.trim()) {
-      showResult('Please enter your area.', true);
-      return;
-    }
+  const page = getTownshipPage(rawArea);
+  if (page) {
+    sessionStorage.removeItem('deliveryMode');
+    window.location.href = page;
+  } else {
+    showResult(`Coming soon to ${rawArea}!`, true);
+    logToHeatmap(rawArea);
+  }
+}
 
-    const page = getTownshipPage(rawArea);
-    if (!page) {
-      showResult(`Coming soon to ${rawArea}!`, true);
-      logToHeatmap(rawArea);
-      return;
-    }
-
-    // Show time estimate
-    const timeInfo = calculateReadyTime();
-    let fullMessage = `${timeInfo.message}\n\nWe’ll confirm your exact ready time when you checkout.`;
-    
-    if (timeInfo.valid) {
-      fullMessage += `\n\nProceed to ${rawArea} kitchens?`;
-      if (confirm(fullMessage)) {
-        sessionStorage.setItem('deliveryMode', 'scheduled');
-        window.location.href = page;
-      }
-    } else {
-      alert(fullMessage);
-    }
+// ✅ UPDATED: Handle "See When You Can Pick Up"
+function handleScheduleDelivery() {
+  const rawArea = searchInput.value;
+  if (!rawArea.trim()) {
+    showResult('Please enter your area.', true);
+    return;
   }
 
-  orderNowBtn.addEventListener('click', handleOrderNow);
-  scheduleBtn.addEventListener('click', handleScheduleDelivery);
+  const page = getTownshipPage(rawArea);
+  if (!page) {
+    showResult(`Coming soon to ${rawArea}!`, true);
+    logToHeatmap(rawArea);
+    return;
+  }
 
-  searchInput.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') {
-      handleOrderNow();
-    }
-  });
+  const timeInfo = generatePickupSlots();
+  if (!timeInfo.valid) {
+    alert(timeInfo.message);
+    return;
+  }
+
+  // Build message with slots
+  let message = "Next available pickup windows:\n\n";
+  message += timeInfo.slots.map(slot => `• ${slot}`).join('\n');
+  message += "\n\nFinal pickup time will be confirmed when you choose your kitchen at checkout.\n\nProceed to select your kitchen?";
+
+  if (confirm(message)) {
+    sessionStorage.setItem('deliveryMode', 'scheduled');
+    window.location.href = page;
+  }
+}
+
+orderNowBtn.addEventListener('click', handleOrderNow);
+scheduleBtn.addEventListener('click', handleScheduleDelivery);
+
+searchInput.addEventListener('keyup', (e) => {
+  if (e.key === 'Enter') {
+    handleOrderNow();
+  }
+});
+
+
 </script>
 </body>
 </html>
