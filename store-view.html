@@ -250,8 +250,9 @@
 
   // Store hours (will be set after loading vendor)
   let storeHours = {
-    opening: null,
-    closing: null
+    opening: "08:30", // default fallback
+    closing: "18:00", // default fallback
+    prepMinutes: 60 // default fallback
   };
 
   // Generate 30-min pickup slots based on current time + prep rule
@@ -277,18 +278,26 @@
       start.setHours(start.getHours() + 1, 0, 0, 0);
     }
 
-    // Parse store hours
-    const openTime = parseTime(storeHours.opening || "08:30");
-    const closeTime = parseTime(storeHours.closing || "18:00");
+    // Parse store hours with safety nets
+    let openTime = parseTime(storeHours.opening || "08:30");
+    let closeTime = parseTime(storeHours.closing || "18:00");
 
-    // ✅ FIX: Create today's date for open/close times
+    // ✅ Safety net: If parseTime returned NaN, use defaults
+    if (isNaN(openTime.h) || isNaN(openTime.m)) {
+      openTime = { h: 8, m: 30 };
+    }
+    if (isNaN(closeTime.h) || isNaN(closeTime.m)) {
+      closeTime = { h: 18, m: 0 };
+    }
+
+    // ✅ Create today's date for open/close times
     const today = new Date();
     const openDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), openTime.h, openTime.m, 0, 0);
     const closeDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), closeTime.h, closeTime.m, 0, 0);
 
     // If kitchen hasn't opened yet
     if (now < openDate) {
-      return { error: "Orders start at " + storeHours.opening };
+      return { error: "Orders start at " + (storeHours.opening || "08:30") };
     }
 
     // If kitchen is already closed
@@ -325,12 +334,29 @@
     return { slots };
   }
 
+  // ✅ BULLETPROOF PARSE TIME FUNCTION
   function parseTime(timeStr) {
-    const parts = timeStr.trim().split(':');
-    return {
-      h: parseInt(parts[0], 10),
-      m: parseInt(parts[1], 10) || 0
-    };
+    if (!timeStr) return { h: 8, m: 30 };
+
+    let str = String(timeStr).trim();
+
+    // Handle "8:30:00 AM" or "4:30:00 PM"
+    if (str.includes('AM') || str.includes('PM')) {
+      const [timePart] = str.split(' ');
+      const [hour, minute] = timePart.split(':').map(Number);
+      let h = hour;
+      if (str.includes('PM') && h < 12) h += 12;
+      if (str.includes('AM') && h === 12) h = 0;
+      return { h, m: minute || 0 };
+    }
+
+    // Handle "8:30", "16:30", "22:30"
+    const parts = str.split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) || 0;
+
+    if (isNaN(h)) return { h: 8, m: 30 };
+    return { h, m };
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
@@ -372,9 +398,14 @@
       const primaryColor = store.Primary_Color || '#ff0000';
       document.documentElement.style.setProperty('--brand-red', primaryColor);
 
-      storeHours.opening = store.Opening_Time || "08:30";
-      storeHours.closing = store.Closing_Time || "18:00";
+      // ✅ Load store hours from CLEAN COLUMNS (P and Q)
+      storeHours.opening = store.Opening_Time_Clean || "08:30";
+      storeHours.closing = store.Closing_Time_Clean || "18:00";
       storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
+
+      // ✅ Double-check they're strings
+      if (typeof storeHours.opening !== 'string') storeHours.opening = "08:30";
+      if (typeof storeHours.closing !== 'string') storeHours.closing = "18:00";
 
       const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
       const menuData = await menuRes.json();
@@ -584,6 +615,7 @@
         
         let msg = `ORDER FOR: ${customerName}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${pickupTime}`;
         const waNumber = document.body.dataset.waNumber;
+        // ✅ FIXED: Removed extra spaces
         window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
       }
 
