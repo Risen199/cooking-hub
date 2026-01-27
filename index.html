@@ -216,8 +216,8 @@ const orderNowBtn = document.getElementById('order-now');
 const scheduleBtn = document.getElementById('schedule-delivery');
 const resultDiv = document.getElementById('result-message');
 
-// ✅ UPDATED: Use your NEW Apps Script URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbxsbDjO_rdzoMRxMNilIabVJmgbqqh_uLhnK8zrvfML0f-w-iSPPcaUafnrhjTmj7BY/exec';
+// ✅ CORRECTED: Use your NEW Apps Script URL
+const API_URL = 'https://script.google.com/macros/s/AKfycbzBzq9Quu4T4vnSPLiXEfP6SRjQRNcG8wybMYUc2xuy-niwGyPpwYd988FaVvranS5o/exec';
 
 function normalizeArea(area) {
   return area.trim().toLowerCase();
@@ -238,7 +238,7 @@ function logToHeatmap(searchTerm) {
   }).catch(err => console.warn('Heatmap log failed:', err));
 }
 
-function showResult(message, isError = false) {
+  function showResult(message, isError = false) {
   resultDiv.textContent = message;
   resultDiv.className = isError ? 'coming-soon' : '';
   resultDiv.style.display = 'block';
