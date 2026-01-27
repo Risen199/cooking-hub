@@ -217,7 +217,7 @@ const scheduleBtn = document.getElementById('schedule-delivery');
 const resultDiv = document.getElementById('result-message');
 
 // ✅ CORRECTED: Use your NEW Apps Script URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbzBzq9Quu4T4vnSPLiXEfP6SRjQRNcG8wybMYUc2xuy-niwGyPpwYd988FaVvranS5o/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzeKZ31xahU04YTWxwSWZKhMLJzID5_nzyr9OH9hYhLoGgxToa7O-KhA5fuNdKnUzE2/exec';
 
 function normalizeArea(area) {
   return area.trim().toLowerCase();
@@ -228,14 +228,9 @@ function getTownshipPage(area) {
 }
 
 function logToHeatmap(searchTerm) {
-  fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type: 'heatmap',
-      data: { Search_Term: searchTerm }
-    })
-  }).catch(err => console.warn('Heatmap log failed:', err));
+  const url = `${API_URL}?type=heatmap&searchTerm=${encodeURIComponent(searchTerm)}`;
+  fetch(url, { method: 'GET' })
+    .catch(err => console.warn('Heatmap log failed:', err));
 }
 
   function showResult(message, isError = false) {
