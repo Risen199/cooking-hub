@@ -215,7 +215,9 @@ const searchInput = document.getElementById('location-search');
 const orderNowBtn = document.getElementById('order-now');
 const scheduleBtn = document.getElementById('schedule-delivery');
 const resultDiv = document.getElementById('result-message');
-const API_URL = 'https://script.google.com/macros/s/AKfycbx2GHqfDnDkeVhlgCBZIjyE9EZB1AGEjJzgJ_WHEcHel1JWRp_J1zenEdq0ifkw-qb8/exec';
+
+// ✅ UPDATED: Use your NEW Apps Script URL
+const API_URL = 'https://script.google.com/macros/s/AKfycbxsbDjO_rdzoMRxMNilIabVJmgbqqh_uLhnK8zrvfML0f-w-iSPPcaUafnrhjTmj7BY/exec';
 
 function normalizeArea(area) {
   return area.trim().toLowerCase();
@@ -293,7 +295,7 @@ function handleOrderNow() {
     window.location.href = page;
   } else {
     showResult(`Coming soon to ${rawArea}!`, true);
-    logToHeatmap(rawArea);
+    logToHeatmap(rawArea); // ✅ Now logs to your new endpoint
   }
 }
 
@@ -308,7 +310,7 @@ function handleScheduleDelivery() {
   const page = getTownshipPage(rawArea);
   if (!page) {
     showResult(`Coming soon to ${rawArea}!`, true);
-    logToHeatmap(rawArea);
+    logToHeatmap(rawArea); // ✅ Logs unmatched searches
     return;
   }
 
@@ -337,8 +339,6 @@ searchInput.addEventListener('keyup', (e) => {
     handleOrderNow();
   }
 });
-
-
 </script>
 </body>
 </html>
