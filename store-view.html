@@ -246,8 +246,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  // ✅ UPDATED: Use your NEW working Apps Script URL
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzeKZ31xahU04YTWxwSWZKhMLJzID5_nzyr9OH9hYhLoGgxToa7O-KhA5fuNdKnUzE2/exec';
+  // ✅ UPDATED: Use your NEW working Apps Script URL (NO TRAILING SPACE!)
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyf9deHyQRJxXVmrpJYVpRcXH5jaDGG4XGQ8YaX4YPHwQ94ijGLvZZMLvw0rCD_te2l/exec';
 
   // Store hours (will be set after loading vendor)
   let storeHours = {
@@ -596,7 +596,42 @@
                   alert("Please enter your name.");
                   return;
                 }
-                sendOrder(name, selectedTime);
+
+                // ✅ SEND ORDER VIA GET TO LOG IT
+                const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
+                const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+                const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
+
+                // Build GET URL for logging
+                const logUrl = new URL(API_URL);
+                logUrl.searchParams.append('type', 'order');
+                logUrl.searchParams.append('storeId', storeId);
+                logUrl.searchParams.append('customerName', name);
+                logUrl.searchParams.append('items', lines.join('|'));
+                logUrl.searchParams.append('total', total.toFixed(2));
+                logUrl.searchParams.append('pickupWindow', selectedTime);
+                logUrl.searchParams.append('waNumber', document.body.dataset.waNumber);
+                logUrl.searchParams.append('message', msg);
+
+                // Log order first
+                fetch(logUrl.toString())
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success) {
+                      // Open WhatsApp after successful log
+                      window.open(data.whatsAppUrl, '_blank');
+                    } else {
+                      alert("Order failed to log. Please try again.");
+                      console.error("Log error:", data.error);
+                    }
+                  })
+                  .catch(err => {
+                    console.warn("Logging failed:", err);
+                    // Fallback: send directly (no log)
+                    const waNumber = document.body.dataset.waNumber;
+                    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                  });
+
                 document.body.removeChild(modal);
                 cartDrawer.classList.remove('active');
                 cartOverlay.classList.remove('active');
@@ -609,16 +644,6 @@
           document.body.removeChild(modal);
         });
       });
-
-      function sendOrder(customerName, pickupTime) {
-        const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
-        const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-        
-        let msg = `ORDER FOR: ${customerName}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${pickupTime}`;
-        const waNumber = document.body.dataset.waNumber;
-        // ✅ FIXED: Removed extra spaces in WhatsApp URL
-        window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-      }
 
     } catch (error) {
       console.error('Error loading store:', error);
