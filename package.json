@@ -1,0 +1,23 @@
+{
+  "name": "limpopo_eats",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Risen199/cooking-hub.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Risen199/cooking-hub/issues"
+  },
+  "homepage": "https://github.com/Risen199/cooking-hub#readme",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
