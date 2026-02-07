@@ -228,14 +228,14 @@ function getTownshipPage(area) {
 }
 
 // ✅ NEW: Log unknown searches to Airtable Heatmap
-async function logToHeatmap(searchTerm) {
+async function logToHeatmap(search_Term) {
   try {
     await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'logHeatmap',          // ← CHANGED "type" → "action"
-        searchTerm: searchTerm.trim().toLowerCase()
+        search_Term: search_Term.trim().toLowerCase()
       })
     });
   } catch (err) {
