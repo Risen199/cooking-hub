@@ -338,11 +338,11 @@
 
     try {
       // Load store info
-      const storeRes = await fetch(`${API_URL}?action=stores`);
-      const storeData = await storeRes.json();
-      if (!storeData.success) throw new Error('Failed to load stores');
+   const storeRes = await fetch(`${API_URL}?action=stores`);
+const storeData = await storeRes.json();
+if (!storeData.success) throw new Error('Failed to load stores');
 
-      const store = storeData.data.find(s => s.Store_ID === storeId);
+const store = storeData.stores.find(s => s.Store_ID === storeId); // ✅ "stores", not "data"
       if (!store) {
         document.getElementById('store-name').textContent = 'Store not found';
         return;
@@ -358,37 +358,39 @@
       storeHours.closing = store.Closing_Time_Clean || "18:00";
       storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
 
-      // Load menu
-      const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
-      const menuData = await menuRes.json();
-      if (!menuData.success) throw new Error('Failed to load menu');
+// Load menu
+    const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
+    const menuData = await menuRes.json();
+    if (!menuData.success) throw new Error('Failed to load menu');
 
-      const menuContainer = document.getElementById('menu-container');
-      if (menuData.data.length === 0) {
-        menuContainer.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">Menu coming soon!</p></div>`;
-        return;
-      }
+    const menuContainer = document.getElementById('menu-container');
 
-      let menuHtml = '';
-      menuData.data.forEach(item => {
-        menuHtml += `
-          <div class="col-6 col-md-3">
-            <div class="menu-item bg-white rounded-3 shadow-sm p-3 text-center h-100"
-                 data-id="${item.Item_ID}" 
-                 data-name="${item.Item_Name}" 
-                 data-price="${item.Price}"
-                 data-description="${item.Description || 'Delicious meal'}">
-              <img src="${item.Image_URL || 'assets/images/image.webp'}" 
-                   class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
-              <h6 class="fw-bold">${item.Item_Name}</h6>
-              <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
-              <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
-              <button class="btn btn-sm w-100 btn-add mt-2" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
-            </div>
+    // ✅ Use menuData.menu — NOT menuData.data
+    if (!menuData.menu || menuData.menu.length === 0) {
+      menuContainer.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">Menu coming soon!</p></div>`;
+      return;
+    }
+
+    let menuHtml = '';
+    menuData.menu.forEach(item => { // ✅ Again: .menu, not .data
+      menuHtml += `
+        <div class="col-6 col-md-3">
+          <div class="menu-item bg-white rounded-3 shadow-sm p-3 text-center h-100"
+              data-id="${item.Item_ID}" 
+              data-name="${item.Item_Name}" 
+              data-price="${item.Price}"
+              data-description="${item.Description || 'Delicious meal'}">
+            <img src="${item.Image_URL || 'assets/images/image.webp'}" 
+                class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
+            <h6 class="fw-bold">${item.Item_Name}</h6>
+            <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
+            <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
+            <button class="btn btn-sm w-100 btn-add mt-2" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
           </div>
-        `;
-      });
-      menuContainer.innerHTML = menuHtml;
+        </div>
+      `;
+    });
+  menuContainer.innerHTML = menuHtml;
 
       // Initialize cart
       let cart = [];

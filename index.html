@@ -234,8 +234,8 @@ async function logToHeatmap(searchTerm) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'heatmap',
-        searchTerm: searchTerm
+        action: 'logHeatmap',          // ← CHANGED "type" → "action"
+        searchTerm: searchTerm.trim().toLowerCase()
       })
     });
   } catch (err) {
