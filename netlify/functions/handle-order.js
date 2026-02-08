@@ -70,13 +70,17 @@ exports.handler = async (event) => {
       // Log unknown area searches to Heatmap table
       if (data.action === 'logHeatmap') {
         const searchTerm = data.Search_Term || data.searchTerm || data.search_Term || '';
+        const now = new Date();
+        const timestamp = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+        
         await fetch(`https://api.airtable.com/v0/${BASE_ID}/Heatmap`, {
           method: 'POST',
           headers: HEADERS,
           body: JSON.stringify({
             records: [{
               fields: {
-                'Search_Term': String(searchTerm).trim().toLowerCase()
+                'Search_Term': String(searchTerm).trim().toLowerCase(),
+                'Timestamp': timestamp
               }
             }]
           })
@@ -90,6 +94,9 @@ exports.handler = async (event) => {
 
       // Log order to Messages table
       if (data.action === 'order') {
+        const now = new Date();
+        const timestamp = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+        
         const orderData = {
           Store_ID: data.Store_ID || data.storeId,
           Customer_Name: data.Customer_Name || data.customerName,
@@ -98,6 +105,7 @@ exports.handler = async (event) => {
           Pickup_Window: data.Pickup_Window || data.pickupWindow || '',
           Delivery_Type: data.Delivery_Type || data.deliveryType || 'Collection',
           Status: 'Ordered',
+          Timestamp: timestamp,
           Source: 'Website',
           Commission_Pool: parseFloat(data.Commission_Pool || 0),
           Promoter_Commission: parseFloat(data.Promoter_Commission || 0),
