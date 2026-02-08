@@ -1,4 +1,8 @@
 // netlify/functions/handle-order.js
+
+// Polyfill for fetch if not available
+const fetch = globalThis.fetch || require('node-fetch');
+
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body } = event;
   const BASE_ID = 'appoP1ZMDdmvT6FS9';
@@ -18,7 +22,6 @@ exports.handler = async (event) => {
         const township = queryStringParameters?.township;
         let url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
         
-        // If township code provided, filter by Township_Code
         if (township) {
           const formula = encodeURIComponent(`{Township_Code} = '${township}'`);
           url += `?filterByFormula=${formula}`;
@@ -67,36 +70,33 @@ exports.handler = async (event) => {
     if (httpMethod === 'POST') {
       const data = JSON.parse(body);
 
-      // Log unknown area searches to Heatmap table
+      // Log unknown area searches to Heatmap table (NO timestamp - let Airtable handle it)
       if (data.action === 'logHeatmap') {
         const searchTerm = data.Search_Term || data.searchTerm || data.search_Term || '';
-        const now = new Date();
-        const timestamp = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
         
-        await fetch(`https://api.airtable.com/v0/${BASE_ID}/Heatmap`, {
+        const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/Heatmap`, {
           method: 'POST',
           headers: HEADERS,
           body: JSON.stringify({
             records: [{
               fields: {
-                'Search_Term': String(searchTerm).trim().toLowerCase(),
-                'Timestamp': timestamp
+                'Search_Term': String(searchTerm).trim().toLowerCase()
               }
             }]
           })
         });
+        
+        const result = await response.json();
+        
         return { 
           statusCode: 200, 
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: true }) 
+          body: JSON.stringify({ success: response.ok, airtableResponse: result }) 
         };
       }
 
-      // Log order to Messages table
+      // Log order to Messages table (NO timestamp - let Airtable handle it)
       if (data.action === 'order') {
-        const now = new Date();
-        const timestamp = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-        
         const orderData = {
           Store_ID: data.Store_ID || data.storeId,
           Customer_Name: data.Customer_Name || data.customerName,
@@ -105,7 +105,6 @@ exports.handler = async (event) => {
           Pickup_Window: data.Pickup_Window || data.pickupWindow || '',
           Delivery_Type: data.Delivery_Type || data.deliveryType || 'Collection',
           Status: 'Ordered',
-          Timestamp: timestamp,
           Source: 'Website',
           Commission_Pool: parseFloat(data.Commission_Pool || 0),
           Promoter_Commission: parseFloat(data.Promoter_Commission || 0),
@@ -116,7 +115,7 @@ exports.handler = async (event) => {
         const orderMessage = `ORDER FOR: ${orderData.Customer_Name}\n${orderData.Order_Items}\nTotal: R${orderData.Total_Amount.toFixed(2)}\n\nPickup window: ${orderData.Pickup_Window}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
+        const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
           method: 'POST',
           headers: HEADERS,
           body: JSON.stringify({
@@ -124,10 +123,12 @@ exports.handler = async (event) => {
           })
         });
 
+        const result = await response.json();
+
         return { 
           statusCode: 200, 
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: true, whatsAppUrl }) 
+          body: JSON.stringify({ success: response.ok, whatsAppUrl, airtableResponse: result }) 
         };
       }
 
@@ -149,7 +150,7 @@ exports.handler = async (event) => {
     return { 
       statusCode: 500, 
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ success: false, error: err.message }) 
+      body: JSON.stringify({ success: false, error: err.message, stack: err.stack }) 
     };
   }
 };
