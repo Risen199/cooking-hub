@@ -97,7 +97,10 @@ exports.handler = async (event) => {
 
       // Log order to Messages table (NO timestamp - let Airtable handle it)
       if (data.action === 'order') {
+        const messageId = 'msg_' + Date.now();
+        
         const orderData = {
+          Message_ID: messageId,
           Store_ID: data.Store_ID || data.storeId,
           Customer_Name: data.Customer_Name || data.customerName,
           Order_Items: data.Order_Items || data.orderItems || data.items,
