@@ -37,6 +37,22 @@
       background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
                   url('assets/images/image.webp') no-repeat center center;
       background-size: cover;
+      position: relative;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 2;
+    }
+    .location-info {
+      margin-top: 15px;
+      font-size: 0.95rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .location-info p {
+      margin: 5px 0;
+      opacity: 0.95;
     }
     .cart-summary {
       position: fixed;
@@ -133,7 +149,6 @@
       margin-top: 8px;
       text-align: center;
     }
-    /* Modal for item details */
     #item-detail-modal {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -162,7 +177,6 @@
 </head>
 <body data-wa-number="27726515909">
 
-  <!-- Item Detail Modal -->
   <div id="item-detail-modal">
     <div class="modal-content">
       <h4 id="detail-name"></h4>
@@ -190,14 +204,18 @@
   <nav class="navbar navbar-expand-lg sticky-top shadow-sm">
     <div class="container">
       <a class="navbar-brand" href="index.html">MZANZI<span class="brand-red">EATS</span></a>
-      <a class="btn btn-outline-dark fw-bold" id="back-btn">← Back</a>
+      <a class="btn btn-outline-dark fw-bold" id="back-btn" href="index.html">← Back</a>
     </div>
   </nav>
 
   <section class="hero">
-    <div class="container">
+    <div class="hero-content container">
       <h1 class="display-3 fw-bold" id="store-name">Loading...</h1>
       <p class="lead fs-4" id="store-slogan"></p>
+      <div class="location-info">
+        <p id="landmarks-text"></p>
+        <p id="description-text" style="font-style: italic;"></p>
+      </div>
     </div>
   </section>
 
@@ -242,7 +260,7 @@
     </div>
   </footer>
 
-  <a href="https://wa.me/27726515909" class="whatsapp-float">💬</a>
+  <a href="https://wa.me/27726515909" class="whatsapp-float" id="wa-float">💬</a>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -324,12 +342,15 @@
     const urlParams = new URLSearchParams(window.location.search);
     const storeId = urlParams.get('storeId');
     const from = urlParams.get('from');
+    const township = urlParams.get('township');
     const backButton = document.getElementById('back-btn');
 
-    if (from === 'blouberg-eats') backButton.href = 'blouberg-eats.html';
-    else if (from === 'mankweng-eats') backButton.href = 'mankweng-eats.html';
-    else if (from === 'seshego-eats') backButton.href = 'seshego-eats.html';
-    else backButton.href = 'index.html';
+    // ✅ FIXED: Handle dynamic hub back button
+    if (from === 'hub' && township) {
+      backButton.href = `hub.html?township=${township}`;
+    } else {
+      backButton.href = 'index.html';
+    }
 
     if (!storeId) {
       document.getElementById('store-name').textContent = 'Store not found';
@@ -338,11 +359,11 @@
 
     try {
       // Load store info
-   const storeRes = await fetch(`${API_URL}?action=stores`);
-const storeData = await storeRes.json();
-if (!storeData.success) throw new Error('Failed to load stores');
+      const storeRes = await fetch(`${API_URL}?action=stores`);
+      const storeData = await storeRes.json();
+      if (!storeData.success) throw new Error('Failed to load stores');
 
-const store = storeData.stores.find(s => s.Store_ID === storeId); // ✅ "stores", not "data"
+      const store = storeData.stores.find(s => s.Store_ID === storeId);
       if (!store) {
         document.getElementById('store-name').textContent = 'Store not found';
         return;
@@ -350,7 +371,18 @@ const store = storeData.stores.find(s => s.Store_ID === storeId); // ✅ "stores
 
       document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
       document.getElementById('store-slogan').textContent = store.Slogan || '';
+      
+      // ✅ NEW: Display Landmarks and Area_Description
+      if (store.Landmarks) {
+        document.getElementById('landmarks-text').innerHTML = `📍 ${store.Landmarks}`;
+      }
+      if (store.Area_Description) {
+        document.getElementById('description-text').textContent = store.Area_Description.replace(/"/g, '');
+      }
+
       document.body.dataset.waNumber = store.WhatsApp || '27726515909';
+      document.getElementById('wa-float').href = `https://wa.me/${store.WhatsApp || '27726515909'}`;
+      
       const primaryColor = store.Primary_Color || '#ff0000';
       document.documentElement.style.setProperty('--brand-red', primaryColor);
 
@@ -358,39 +390,38 @@ const store = storeData.stores.find(s => s.Store_ID === storeId); // ✅ "stores
       storeHours.closing = store.Closing_Time_Clean || "18:00";
       storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
 
-// Load menu
-    const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
-    const menuData = await menuRes.json();
-    if (!menuData.success) throw new Error('Failed to load menu');
+      // Load menu
+      const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
+      const menuData = await menuRes.json();
+      if (!menuData.success) throw new Error('Failed to load menu');
 
-    const menuContainer = document.getElementById('menu-container');
+      const menuContainer = document.getElementById('menu-container');
 
-    // ✅ Use menuData.menu — NOT menuData.data
-    if (!menuData.menu || menuData.menu.length === 0) {
-      menuContainer.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">Menu coming soon!</p></div>`;
-      return;
-    }
+      if (!menuData.menu || menuData.menu.length === 0) {
+        menuContainer.innerHTML = `<div class="col-12 text-center py-5"><p class="text-muted">Menu coming soon!</p></div>`;
+        return;
+      }
 
-    let menuHtml = '';
-    menuData.menu.forEach(item => { // ✅ Again: .menu, not .data
-      menuHtml += `
-        <div class="col-6 col-md-3">
-          <div class="menu-item bg-white rounded-3 shadow-sm p-3 text-center h-100"
-              data-id="${item.Item_ID}" 
-              data-name="${item.Item_Name}" 
-              data-price="${item.Price}"
-              data-description="${item.Description || 'Delicious meal'}">
-            <img src="${item.Image_URL || 'assets/images/image.webp'}" 
-                class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
-            <h6 class="fw-bold">${item.Item_Name}</h6>
-            <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
-            <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
-            <button class="btn btn-sm w-100 btn-add mt-2" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
+      let menuHtml = '';
+      menuData.menu.forEach(item => {
+        menuHtml += `
+          <div class="col-6 col-md-3">
+            <div class="menu-item bg-white rounded-3 shadow-sm p-3 text-center h-100"
+                data-id="${item.Item_ID}" 
+                data-name="${item.Item_Name}" 
+                data-price="${item.Price}"
+                data-description="${item.Description || 'Delicious meal'}">
+              <img src="${item.Image_URL || 'assets/images/image.webp'}" 
+                  class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
+              <h6 class="fw-bold">${item.Item_Name}</h6>
+              <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
+              <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
+              <button class="btn btn-sm w-100 btn-add mt-2" style="background-color: var(--brand-red); color: white;">➕ Add to Cart</button>
+            </div>
           </div>
-        </div>
-      `;
-    });
-  menuContainer.innerHTML = menuHtml;
+        `;
+      });
+      menuContainer.innerHTML = menuHtml;
 
       // Initialize cart
       let cart = [];
@@ -486,7 +517,7 @@ const store = storeData.stores.find(s => s.Store_ID === storeId); // ✅ "stores
         cartOverlay.classList.remove('active');
       });
 
-      // ✅ FIXED CHECKOUT: Uses POST to log orders to Airtable
+      // ✅ FIXED CHECKOUT: Correct field names for Airtable
       document.getElementById('checkout-btn').addEventListener('click', function() {
         if (cart.length === 0) return;
 
@@ -542,35 +573,42 @@ const store = storeData.stores.find(s => s.Store_ID === storeId); // ✅ "stores
                   return;
                 }
 
+                // ✅ FIXED: Use pipe separator like in actual Airtable data
                 const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
                 const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-                const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
 
-                // ✅ SEND ORDER VIA POST TO AIRTABLE
+                // ✅ FIXED: Correct field names for Airtable Messages table
                 fetch(API_URL, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    type: 'order',
-                    storeId: storeId,
-                    customerName: name,
-                    items: lines.join('\n'),
-                    total: total.toFixed(2),
-                    pickupWindow: selectedTime,
+                    action: 'order',
+                    Store_ID: storeId,
+                    Customer_Name: name,
+                    Order_Items: lines.join('|'),
+                    Total_Amount: total,
+                    Pickup_Window: selectedTime,
+                    Delivery_Type: 'Collection',
                     waNumber: document.body.dataset.waNumber
                   })
                 })
                 .then(res => res.json())
                 .then(data => {
-                  if (data.success) {
+                  if (data.success && data.whatsAppUrl) {
                     window.open(data.whatsAppUrl, '_blank');
+                    cart = [];
+                    window.cart = cart;
+                    updateCartUI();
                   } else {
-                    alert("Order failed to log. Please try again.");
-                    console.error("Log error:", data.error);
+                    alert("Order logging failed. Opening WhatsApp anyway...");
+                    const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
+                    const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
+                    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                   }
                 })
                 .catch(err => {
                   console.warn("Logging failed:", err);
+                  const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                   const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                   window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 });

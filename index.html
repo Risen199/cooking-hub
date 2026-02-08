@@ -87,17 +87,6 @@
       50% { box-shadow: 0 0 30px #4CAF50; transform: scale(1.05); }
       100% { box-shadow: 0 0 5px #4CAF50; transform: scale(1); }
     }
-    .btn-outline-dark {
-      background: transparent !important;
-      color: #000 !important;
-      border: 2px solid #000 !important;
-      font-weight: 700 !important;
-      padding: 16px 45px !important;
-      border-radius: 8px !important;
-      font-size: 1.2rem;
-      width: 100%;
-      margin: 8px 0;
-    }
     .big-footer {
       background: #000 !important;
       color: white !important;
@@ -184,31 +173,32 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-// Full area-to-township mapping (UNCHANGED)
+// ✅ UPDATED: Map areas to township CODES (not HTML files)
 const TOWNSHIP_MAP = {
-  // Blouberg
-  'senwabarwana': 'blouberg-eats.html',
-  'dilaeneng': 'blouberg-eats.html',
-  'mashalane': 'blouberg-eats.html',
-  'bochum': 'blouberg-eats.html',
-  'maokeng': 'blouberg-eats.html',
-  'extension 5': 'blouberg-eats.html',
-  'desmond park': 'blouberg-eats.html',
-  'broekman': 'blouberg-eats.html',
-  'blouberg': 'blouberg-eats.html',
-  // Seshego
-  'zone 1': 'seshego-eats.html',
-  'zone 2': 'seshego-eats.html',
-  'zone 3': 'seshego-eats.html',
-  'circle centre': 'seshego-eats.html',
-  'seshego': 'seshego-eats.html',
-  // Mankweng
-  'gate 1': 'mankweng-eats.html',
-  'gate 2': 'mankweng-eats.html',
-  'gate 3': 'mankweng-eats.html',
-  'hwiti': 'mankweng-eats.html',
-  'campus': 'mankweng-eats.html',
-  'mankweng': 'mankweng-eats.html'
+  // Blouberg → BLB
+  'senwabarwana': 'BLB',
+  'dilaeneng': 'BLB',
+  'mashalane': 'BLB',
+  'bochum': 'BLB',
+  'maokeng': 'BLB',
+  'extension 5': 'BLB',
+  'desmond park': 'BLB',
+  'broekman': 'BLB',
+  'blouberg': 'BLB',
+  'mareiss': 'BLB',
+  // Seshego → SES
+  'zone 1': 'SES',
+  'zone 2': 'SES',
+  'zone 3': 'SES',
+  'circle centre': 'SES',
+  'seshego': 'SES',
+  // Mankweng → MAN
+  'gate 1': 'MAN',
+  'gate 2': 'MAN',
+  'gate 3': 'MAN',
+  'hwiti': 'MAN',
+  'campus': 'MAN',
+  'mankweng': 'MAN'
 };
 
 const searchInput = document.getElementById('location-search');
@@ -216,26 +206,25 @@ const orderNowBtn = document.getElementById('order-now');
 const scheduleBtn = document.getElementById('schedule-delivery');
 const resultDiv = document.getElementById('result-message');
 
-// ✅ UPDATED: Use Netlify Function (not Apps Script)
 const API_URL = '/.netlify/functions/handle-order';
 
 function normalizeArea(area) {
   return area.trim().toLowerCase();
 }
 
-function getTownshipPage(area) {
+function getTownshipCode(area) {
   return TOWNSHIP_MAP[normalizeArea(area)];
 }
 
-// ✅ NEW: Log unknown searches to Airtable Heatmap
-async function logToHeatmap(search_Term) {
+// ✅ FIXED: Log to Heatmap with correct field name
+async function logToHeatmap(searchTerm) {
   try {
     await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: 'logHeatmap',          // ← CHANGED "type" → "action"
-        search_Term: search_Term.trim().toLowerCase()
+        action: 'logHeatmap',
+        Search_Term: searchTerm.trim().toLowerCase()
       })
     });
   } catch (err) {
@@ -249,7 +238,6 @@ function showResult(message, isError = false) {
   resultDiv.style.display = 'block';
 }
 
-// ✅ Pickup slot logic (UNCHANGED)
 function generatePickupSlots() {
   const now = new Date();
   const open = new Date();
@@ -291,13 +279,14 @@ function handleOrderNow() {
     return;
   }
 
-  const page = getTownshipPage(rawArea);
-  if (page) {
+  const townshipCode = getTownshipCode(rawArea);
+  if (townshipCode) {
     sessionStorage.removeItem('deliveryMode');
-    window.location.href = page;
+    // ✅ FIXED: Redirect to hub.html with township code
+    window.location.href = `hub.html?township=${townshipCode}`;
   } else {
     showResult(`Coming soon to ${rawArea}!`, true);
-    logToHeatmap(rawArea); // ✅ Logs to Airtable Heatmap
+    logToHeatmap(rawArea);
   }
 }
 
@@ -308,10 +297,10 @@ function handleScheduleDelivery() {
     return;
   }
 
-  const page = getTownshipPage(rawArea);
-  if (!page) {
+  const townshipCode = getTownshipCode(rawArea);
+  if (!townshipCode) {
     showResult(`Coming soon to ${rawArea}!`, true);
-    logToHeatmap(rawArea); // ✅ Logs to Airtable
+    logToHeatmap(rawArea);
     return;
   }
 
@@ -327,7 +316,7 @@ function handleScheduleDelivery() {
 
   if (confirm(message)) {
     sessionStorage.setItem('deliveryMode', 'scheduled');
-    window.location.href = page;
+    window.location.href = `hub.html?township=${townshipCode}`;
   }
 }
 
