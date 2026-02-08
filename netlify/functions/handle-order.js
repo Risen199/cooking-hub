@@ -1,6 +1,5 @@
 // netlify/functions/handle-order.js
 
-// Polyfill for fetch if not available
 const fetch = globalThis.fetch || require('node-fetch');
 
 exports.handler = async (event) => {
@@ -17,7 +16,6 @@ exports.handler = async (event) => {
     if (httpMethod === 'GET') {
       const action = queryStringParameters?.action;
 
-      // Fetch all stores (optionally filtered by township)
       if (action === 'stores') {
         const township = queryStringParameters?.township;
         let url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
@@ -37,13 +35,11 @@ exports.handler = async (event) => {
         };
       }
 
-      // Fetch menu for specific store
       if (action === 'menu') {
         const storeId = queryStringParameters.storeId;
         if (!storeId) {
           return { 
             statusCode: 400, 
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ success: false, error: 'Missing storeId' }) 
           };
         }
@@ -54,14 +50,12 @@ exports.handler = async (event) => {
         const menu = data.records?.map(r => r.fields) || [];
         return { 
           statusCode: 200, 
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ success: true, menu }) 
         };
       }
 
       return { 
         statusCode: 400, 
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ success: false, error: 'Invalid GET action' }) 
       };
     }
@@ -70,7 +64,6 @@ exports.handler = async (event) => {
     if (httpMethod === 'POST') {
       const data = JSON.parse(body);
 
-      // Log unknown area searches to Heatmap table (NO timestamp - let Airtable handle it)
       if (data.action === 'logHeatmap') {
         const searchTerm = data.Search_Term || data.searchTerm || data.search_Term || '';
         
@@ -90,70 +83,99 @@ exports.handler = async (event) => {
         
         return { 
           statusCode: 200, 
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ success: response.ok, airtableResponse: result }) 
         };
       }
 
-      // Log order to Messages table (NO timestamp - let Airtable handle it)
+      // ✅ FIXED ORDER LOGGING
       if (data.action === 'order') {
-        const messageId = 'msg_' + Date.now();
-        
-        const orderData = {
-          Message_ID: messageId,
-          Store_ID: data.Store_ID || data.storeId,
-          Customer_Name: data.Customer_Name || data.customerName,
-          Order_Items: data.Order_Items || data.orderItems || data.items,
-          Total_Amount: parseFloat(data.Total_Amount || data.totalAmount || data.total || 0),
-          Pickup_Window: data.Pickup_Window || data.pickupWindow || '',
-          Delivery_Type: data.Delivery_Type || data.deliveryType || 'Collection',
-          Status: 'Ordered',
-          Source: 'Website',
-          Commission_Pool: parseFloat(data.Commission_Pool || 0),
-          Promoter_Commission: parseFloat(data.Promoter_Commission || 0),
-          Company_Commission: parseFloat(data.Company_Commission || 0)
-        };
+        console.log('🔴 ORDER RECEIVED:', data);
 
+        // Get store WhatsApp number (fallback to default if not provided)
         const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
-        const orderMessage = `ORDER FOR: ${orderData.Customer_Name}\n${orderData.Order_Items}\nTotal: R${orderData.Total_Amount.toFixed(2)}\n\nPickup window: ${orderData.Pickup_Window}`;
+        
+        // Format order items properly for WhatsApp message
+        const orderItems = typeof data.Order_Items === 'string' 
+          ? data.Order_Items.replace(/\|/g, '\n')  // Replace pipes with newlines
+          : 'No items specified';
+        
+        const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${orderItems}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
-          method: 'POST',
-          headers: HEADERS,
-          body: JSON.stringify({
-            records: [{ fields: orderData }]
-          })
-        });
-
-        const result = await response.json();
-
-        return { 
-          statusCode: 200, 
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: response.ok, whatsAppUrl, airtableResponse: result }) 
+        // ✅ FIXED: Log order to Messages table with ALL required fields
+        const orderData = {
+          Message_ID: 'msg_' + Date.now() + Math.floor(Math.random() * 1000),
+          Store_ID: data.Store_ID || data.storeId || 'unknown',
+          Customer_Name: data.Customer_Name || data.customerName || 'Customer',
+          Order_Items: data.Order_Items || data.orderItems || 'No items',
+          Total_Amount: parseFloat(data.Total_Amount || data.totalAmount || data.total || 0),
+          Pickup_Window: data.Pickup_Window || data.pickupWindow || 'ASAP',
+          Delivery_Type: data.Delivery_Type || data.deliveryType || 'Collection',
+          Status: 'Ordered',
+          Source: 'Website'
         };
+
+        console.log('🟢 SENDING TO AIRTABLE:', orderData);
+
+        try {
+          const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
+            method: 'POST',
+            headers: HEADERS,
+            body: JSON.stringify({
+              records: [{ fields: orderData }]
+            })
+          });
+
+          const result = await response.json();
+          console.log('🟡 AIRTABLE RESPONSE:', result);
+
+          return { 
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              success: response.ok, 
+              whatsAppUrl, 
+              airtableResponse: result,
+              message: 'Order logged successfully' 
+            }) 
+          };
+        } catch (airtableError) {
+          console.error('🔴 AIRTABLE ERROR:', airtableError);
+          // Still return WhatsApp URL even if logging fails
+          return { 
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              success: false, 
+              whatsAppUrl,
+              error: 'Order sent to WhatsApp but failed to log to database',
+              airtableError: airtableError.message 
+            }) 
+          };
+        }
       }
 
       return { 
         statusCode: 400, 
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ success: false, error: 'Invalid POST action' }) 
       };
     }
 
     return { 
       statusCode: 405, 
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ success: false, error: 'Method not allowed' }) 
     };
 
   } catch (err) {
-    console.error('Function error:', err);
+    console.error('❌ FUNCTION ERROR:', err);
     return { 
       statusCode: 500, 
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ success: false, error: err.message, stack: err.stack }) 
+      body: JSON.stringify({ 
+        success: false, 
+        error: err.message, 
+        stack: err.stack 
+      }) 
     };
   }
 };
