@@ -12,29 +12,41 @@ exports.handler = async (event) => {
   };
 
   try {
-    // === GET: stores or menu ===
+    // === GET: stores, menu, searchArea, getHub ===
     if (httpMethod === 'GET') {
       const action = queryStringParameters?.action;
 
+      // === UPDATED: Fetch stores with new status fields ===
       if (action === 'stores') {
         const township = queryStringParameters?.township;
-        let url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
         
+        // Start with base filter for active stores
+        let formula = '{Is_Active} = TRUE()';
         if (township) {
-          const formula = encodeURIComponent(`{Township_Code} = '${township}'`);
-          url += `?filterByFormula=${formula}`;
+          formula = `AND(${formula}, {Township_Code} = '${township}')`;
         }
+        
+        const encodedFormula = encodeURIComponent(formula);
+        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodedFormula}`;
         
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
-        const stores = data.records?.map(r => r.fields) || [];
-        return { 
-          statusCode: 200, 
+        
+        // Map records to include the new fields
+        const stores = data.records?.map(r => ({
+          ...r.fields,
+          Temporarily_Closed: r.fields.Temporarily_Closed || false,
+          Status_Message: r.fields.Status_Message || ''
+        })) || [];
+        
+        return {
+          statusCode: 200,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: true, stores }) 
+          body: JSON.stringify({ success: true, stores })
         };
       }
 
+      // Fetch menu for specific store (NO CHANGES)
       if (action === 'menu') {
         const storeId = queryStringParameters.storeId;
         if (!storeId) {
@@ -54,6 +66,79 @@ exports.handler = async (event) => {
         };
       }
 
+      // === NEW: Search area using Location_Aliases ===
+      if (action === 'searchArea') {
+        const searchTerm = queryStringParameters?.q?.toLowerCase().trim();
+        if (!searchTerm) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ success: false, error: 'Missing search term (q)' })
+          };
+        }
+
+        // Fetch ALL active stores
+        const allStoresUrl = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent('{Is_Active} = TRUE()')}`;
+        const storesRes = await fetch(allStoresUrl, { headers: HEADERS });
+        const storesData = await storesRes.json();
+        const allStores = storesData.records?.map(r => r.fields) || [];
+
+        // Find store where searchTerm matches any Location_Aliases
+        let foundTownshipCode = null;
+        for (const store of allStores) {
+          const aliases = store.Location_Aliases
+            ?.split(',')
+            .map(a => a.trim().toLowerCase());
+
+          if (aliases && aliases.includes(searchTerm)) {
+            foundTownshipCode = store.Township_Code;
+            break;
+          }
+        }
+
+        if (foundTownshipCode) {
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ success: true, townshipCode: foundTownshipCode })
+          };
+        } else {
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ success: false, message: 'Area not found' })
+          };
+        }
+      }
+
+      // === NEW: Get hub configuration ===
+      if (action === 'getHub') {
+        const townshipCode = queryStringParameters?.township;
+        if (!townshipCode) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ success: false, error: 'Missing township code' })
+          };
+        }
+
+        // Use Table ID for Hub_Configs: tblTBMwzYMzS8EIYx
+        const formula = encodeURIComponent(`AND({Township_Code} = '${townshipCode}', {Is_Active} = TRUE())`);
+        const url = `https://api.airtable.com/v0/${BASE_ID}/tblTBMwzYMzS8EIYx?filterByFormula=${formula}`;
+        
+        const res = await fetch(url, { headers: HEADERS });
+        const data = await res.json();
+        
+        if (data.records.length > 0) {
+          const hubConfig = data.records[0].fields;
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ success: true, hub: hubConfig })
+          };
+        } else {
+          return {
+            statusCode: 404,
+            body: JSON.stringify({ success: false, error: 'Hub not found' })
+          };
+        }
+      }
+
       return { 
         statusCode: 400, 
         body: JSON.stringify({ success: false, error: 'Invalid GET action' }) 
@@ -64,6 +149,7 @@ exports.handler = async (event) => {
     if (httpMethod === 'POST') {
       const data = JSON.parse(body);
 
+      // Log unknown area searches to Heatmap table
       if (data.action === 'logHeatmap') {
         const searchTerm = data.Search_Term || data.searchTerm || data.search_Term || '';
         
@@ -87,22 +173,22 @@ exports.handler = async (event) => {
         };
       }
 
-      // ✅ FIXED ORDER LOGGING
+      // Log order to Messages table
       if (data.action === 'order') {
         console.log('🔴 ORDER RECEIVED:', data);
 
-        // Get store WhatsApp number (fallback to default if not provided)
+        // Get store WhatsApp number
         const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
         
-        // Format order items properly for WhatsApp message
+        // Format order items for WhatsApp message
         const orderItems = typeof data.Order_Items === 'string' 
-          ? data.Order_Items.replace(/\|/g, '\n')  // Replace pipes with newlines
+          ? data.Order_Items.replace(/\|/g, '\n')
           : 'No items specified';
         
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${orderItems}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        // ✅ FIXED: Log order to Messages table with ALL required fields
+        // Order data for Airtable
         const orderData = {
           Message_ID: 'msg_' + Date.now() + Math.floor(Math.random() * 1000),
           Store_ID: data.Store_ID || data.storeId || 'unknown',
@@ -141,7 +227,6 @@ exports.handler = async (event) => {
           };
         } catch (airtableError) {
           console.error('🔴 AIRTABLE ERROR:', airtableError);
-          // Still return WhatsApp URL even if logging fails
           return { 
             statusCode: 200,
             headers: { 'Content-Type': 'application/json' },
