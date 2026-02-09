@@ -173,7 +173,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-// ✅ UPDATED: Map areas to township CODES (not HTML files)
+// ✅ KEPT: Hardcoded map as FALLBACK only
 const TOWNSHIP_MAP = {
   // Blouberg → BLB
   'senwabarwana': 'BLB',
@@ -272,51 +272,121 @@ function generatePickupSlots() {
   return { valid: true, slots };
 }
 
-function handleOrderNow() {
-  const rawArea = searchInput.value;
-  if (!rawArea.trim()) {
+// ✅ UPDATED: Primary search using Airtable API
+async function handleOrderNow() {
+  const rawArea = searchInput.value.trim();
+  if (!rawArea) {
     showResult('Please enter your area.', true);
     return;
   }
 
-  const townshipCode = getTownshipCode(rawArea);
-  if (townshipCode) {
-    sessionStorage.removeItem('deliveryMode');
-    // ✅ FIXED: Redirect to hub.html with township code
-    window.location.href = `hub.html?township=${townshipCode}`;
-  } else {
-    showResult(`Coming soon to ${rawArea}!`, true);
-    logToHeatmap(rawArea);
+  try {
+    // 1. Try Airtable API first
+    const response = await fetch(`${API_URL}?action=searchArea&q=${encodeURIComponent(rawArea)}`);
+    const data = await response.json();
+    
+    if (data.success && data.townshipCode) {
+      // Airtable search succeeded
+      sessionStorage.removeItem('deliveryMode');
+      window.location.href = `hub.html?township=${data.townshipCode}`;
+      return;
+    }
+    
+    // 2. Airtable search failed, fallback to hardcoded map
+    const townshipCode = getTownshipCode(rawArea);
+    if (townshipCode) {
+      showResult('⚠️ Using backup search system...', false);
+      setTimeout(() => {
+        sessionStorage.removeItem('deliveryMode');
+        window.location.href = `hub.html?township=${townshipCode}`;
+      }, 500);
+    } else {
+      // 3. Neither found - log to heatmap
+      showResult(`Coming soon to ${rawArea}!`, true);
+      logToHeatmap(rawArea);
+    }
+  } catch (error) {
+    console.error('Search API error:', error);
+    // API failed completely, use hardcoded map
+    const townshipCode = getTownshipCode(rawArea);
+    if (townshipCode) {
+      showResult('⚠️ Search service offline. Using local data...', false);
+      setTimeout(() => {
+        sessionStorage.removeItem('deliveryMode');
+        window.location.href = `hub.html?township=${townshipCode}`;
+      }, 500);
+    } else {
+      showResult(`Coming soon to ${rawArea}!`, true);
+      logToHeatmap(rawArea);
+    }
   }
 }
 
-function handleScheduleDelivery() {
-  const rawArea = searchInput.value;
-  if (!rawArea.trim()) {
+// ✅ UPDATED: Schedule delivery also uses Airtable
+async function handleScheduleDelivery() {
+  const rawArea = searchInput.value.trim();
+  if (!rawArea) {
     showResult('Please enter your area.', true);
     return;
   }
 
-  const townshipCode = getTownshipCode(rawArea);
-  if (!townshipCode) {
-    showResult(`Coming soon to ${rawArea}!`, true);
-    logToHeatmap(rawArea);
-    return;
-  }
+  try {
+    // Try Airtable API first
+    const response = await fetch(`${API_URL}?action=searchArea&q=${encodeURIComponent(rawArea)}`);
+    const data = await response.json();
+    
+    let townshipCode = null;
+    if (data.success && data.townshipCode) {
+      townshipCode = data.townshipCode;
+    } else {
+      // Fallback to hardcoded map
+      townshipCode = getTownshipCode(rawArea);
+    }
+    
+    if (!townshipCode) {
+      showResult(`Coming soon to ${rawArea}!`, true);
+      logToHeatmap(rawArea);
+      return;
+    }
 
-  const timeInfo = generatePickupSlots();
-  if (!timeInfo.valid) {
-    alert(timeInfo.message);
-    return;
-  }
+    const timeInfo = generatePickupSlots();
+    if (!timeInfo.valid) {
+      alert(timeInfo.message);
+      return;
+    }
 
-  let message = "Next available pickup windows:\n\n";
-  message += timeInfo.slots.map(slot => `• ${slot}`).join('\n');
-  message += "\n\nFinal pickup time will be confirmed when you choose your kitchen at checkout.\n\nProceed to select your kitchen?";
+    let message = "Next available pickup windows:\n\n";
+    message += timeInfo.slots.map(slot => `• ${slot}`).join('\n');
+    message += "\n\nFinal pickup time will be confirmed when you choose your kitchen at checkout.\n\nProceed to select your kitchen?";
 
-  if (confirm(message)) {
-    sessionStorage.setItem('deliveryMode', 'scheduled');
-    window.location.href = `hub.html?township=${townshipCode}`;
+    if (confirm(message)) {
+      sessionStorage.setItem('deliveryMode', 'scheduled');
+      window.location.href = `hub.html?township=${townshipCode}`;
+    }
+  } catch (error) {
+    console.error('Schedule search error:', error);
+    // Fallback to hardcoded map
+    const townshipCode = getTownshipCode(rawArea);
+    if (!townshipCode) {
+      showResult(`Coming soon to ${rawArea}!`, true);
+      logToHeatmap(rawArea);
+      return;
+    }
+    
+    const timeInfo = generatePickupSlots();
+    if (!timeInfo.valid) {
+      alert(timeInfo.message);
+      return;
+    }
+    
+    let message = "Next available pickup windows:\n\n";
+    message += timeInfo.slots.map(slot => `• ${slot}`).join('\n');
+    message += "\n\nFinal pickup time will be confirmed when you choose your kitchen at checkout.\n\nProceed to select your kitchen?";
+
+    if (confirm(message)) {
+      sessionStorage.setItem('deliveryMode', 'scheduled');
+      window.location.href = `hub.html?township=${townshipCode}`;
+    }
   }
 }
 

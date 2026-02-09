@@ -5,7 +5,7 @@ const fetch = globalThis.fetch || require('node-fetch');
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body } = event;
   const BASE_ID = 'appoP1ZMDdmvT6FS9';
-  const TOKEN = 'patMK7isPmfDCmx3F.91c22d6c139da1dc37a47247ea87b2e98c30a4621b7cc58179da1fda2703a5b2';
+  const TOKEN = 'patt5rEogpO4GBF3J.62aa651a0d72ee5bf4e59d99eeada69912249c6b3760158cec086da40a776465';
   const HEADERS = {
     'Authorization': `Bearer ${TOKEN}`,
     'Content-Type': 'application/json'
