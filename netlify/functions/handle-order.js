@@ -34,7 +34,7 @@ if (!TOKEN) {
         const township = queryStringParameters?.township;
         
         // Start with base filter for active stores
-        let formula = '{Is_Active} = TRUE()';
+        let formula = "{Is_Active} = 'checked'";
         if (township) {
           formula = `AND(${formula}, {Township_Code} = '${township}')`;
         }
