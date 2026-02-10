@@ -4,8 +4,21 @@ const fetch = globalThis.fetch || require('node-fetch');
 
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body } = event;
-  const BASE_ID = 'appoP1ZMDdmvT6FS9';
-  const TOKEN = 'patt5rEogpO4GBF3J.62aa651a0d72ee5bf4e59d99eeada69912249c6b3760158cec086da40a776465';
+  const BASE_ID = process.env.AIRTABLE_BASE_ID || 'appoP1ZMDdmvT6FS9';
+const TOKEN = process.env.AIRTABLE_TOKEN;
+
+// Add safety check
+if (!TOKEN) {
+  console.error('❌ AIRTABLE_TOKEN missing');
+  return {
+    statusCode: 500,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      success: false, 
+      error: 'Server configuration error'
+    })
+  };
+}
   const HEADERS = {
     'Authorization': `Bearer ${TOKEN}`,
     'Content-Type': 'application/json'
