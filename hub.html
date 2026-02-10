@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -27,8 +28,8 @@
     }
     .brand-red { color: var(--brand-red); }
     .hero-home {
-      background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.6)), 
-                  url('assets/images/image.webp') center/cover no-repeat;
+      background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), 
+      center/cover no-repeat;
       height: 80vh;
       display: flex;
       align-items: center;
@@ -165,30 +166,6 @@
   <script>
     const API_URL = '/.netlify/functions/handle-order';
 
-    // ✅ HARDCODED HUB CONFIGURATIONS (FALLBACK)
-    const HUB_CONFIG = {
-      'BLB': {
-        name: 'Blouberg',
-        hero: 'assets/images/image.webp',
-        slogan: 'Where Township Flavours Meet Digital Excellence',
-        color: '#e74c3c',
-        storeCountText: 'Legendary Kitchens'
-      },
-      'SES': {
-        name: 'Seshego', 
-        hero: 'assets/images/image.webp',
-        slogan: 'Street Food Royalty, Delivered to You',
-        color: '#f39c12',
-        storeCountText: 'Local Favorites'
-      },
-      'MAN': {
-        name: 'Mankweng',
-        hero: 'assets/images/image.webp', 
-        slogan: 'Campus Cravings, Satisfied Daily',
-        color: '#9b59b6',
-        storeCountText: 'Student Specials'
-      }
-    };
 
     // Get township code from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -217,20 +194,17 @@
             storeCountText: data.hub.StoreCountText || 'Local Kitchens'
           };
         } else {
-          throw new Error('Hub not found in Airtable');
-        }
+      console.warn('Hub not found for township:', townshipCode);
+      alert(`Township "${townshipCode}" not found. Redirecting to home...`);
+      window.location.href = 'index.html';
+      return null;
+    }
       } catch (error) {
-        console.warn('⚠️ Could not load from Airtable, using fallback:', error.message);
-        
-        // 2. Fallback to hardcoded config
-        if (HUB_CONFIG[townshipCode]) {
-          return HUB_CONFIG[townshipCode];
-        } else {
-          alert('Invalid township. Redirecting to home...');
-          window.location.href = 'index.html';
-          return null;
-        }
-      }
+      console.error('❌ Error loading hub:', error);
+      alert('Error loading township. Returning to home...');
+      window.location.href = 'index.html';
+      return null;
+    }
     }
 
     // Main initialization
@@ -246,7 +220,7 @@
       document.documentElement.style.setProperty('--brand-red', config.color);
       
       const heroSection = document.getElementById('hero-section');
-      heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('${config.hero}')`;
+      heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${config.hero}')`;
       
       // Update hero text
       const heroTitle = document.querySelector('.hero-home .display-2');
