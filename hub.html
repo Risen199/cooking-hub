@@ -281,7 +281,7 @@
         const storesHTML = stores.map(store => {
           let statusBadge = '';
           if (store.Temporarily_Closed && store.Status_Message) {
-            statusBadge = `<span class="badge bg-danger position-absolute" style="top:10px; left:10px;">${store.Status_Message}</span>`;
+            statusBadge = `<span class="badge bg-danger position-absolute" style="top:40px; left:10px; z-index:10;">${store.Status_Message}</span>`;  
           } else if (store.Temporarily_Closed) {
             statusBadge = `<span class="badge bg-warning position-absolute" style="top:10px; left:10px;">Temporarily Closed</span>`;
           }
