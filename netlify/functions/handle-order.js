@@ -33,11 +33,20 @@ exports.handler = async (event) => {
         const data = await res.json();
         
         // Map records to include the new fields
-        const stores = data.records?.map(r => ({
-          ...r.fields,
-          Temporarily_Closed: r.fields.Temporarily_Closed || false,
-          Status_Message: r.fields.Status_Message || ''
-        })) || [];
+        const stores = data.records?.map(r => {
+        const fields = r.fields;
+        // Convert Location_Aliases array to string for frontend compatibility
+        const locationAliases = Array.isArray(fields.Location_Aliases) 
+          ? fields.Location_Aliases.join(',')
+          : fields.Location_Aliases || '';
+          
+        return {
+          ...fields,
+          Location_Aliases: locationAliases, // Ensure string format
+          Temporarily_Closed: fields.Temporarily_Closed || false,
+          Status_Message: fields.Status_Message || ''
+        };
+      }) || [];
         
         return {
           statusCode: 200,
@@ -77,7 +86,7 @@ exports.handler = async (event) => {
         }
 
         // Fetch ALL active stores
-        const allStoresUrl = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent('{Is_Active} = TRUE()')}`;
+        const allStoresUrl = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent('OR({Is_Active} = TRUE(), {Is_Active} = "")')}`;
         const storesRes = await fetch(allStoresUrl, { headers: HEADERS });
         const storesData = await storesRes.json();
         const allStores = storesData.records?.map(r => r.fields) || [];
@@ -85,9 +94,15 @@ exports.handler = async (event) => {
         // Find store where searchTerm matches any Location_Aliases
         let foundTownshipCode = null;
         for (const store of allStores) {
-          const aliases = store.Location_Aliases
-            ?.split(',')
-            .map(a => a.trim().toLowerCase());
+          let aliases = [];
+if (Array.isArray(store.Location_Aliases)) {
+  // Multiple Select field returns array
+  aliases = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
+} else if (typeof store.Location_Aliases === 'string') {
+  // Text field returns string (backward compatibility)
+  aliases = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
+}
+// If field is empty/null, aliases stays empty array
 
           if (aliases && aliases.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
