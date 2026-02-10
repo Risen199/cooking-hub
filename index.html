@@ -172,34 +172,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-// ✅ KEPT: Hardcoded map as FALLBACK only
-const TOWNSHIP_MAP = {
-  // Blouberg → BLB
-  'dilaeneng': 'BLB',
-  'mashalane': 'BLB',
-  'bochum': 'BLB',
-  'maokeng': 'BLB',
-  'extension 5': 'BLB',
-  'desmond park': 'BLB',
-  'broekman': 'BLB',
-  'blouberg': 'BLB',
-  'mareiss': 'BLB',
-  // Seshego → SES
-  'zone 1': 'SES',
-  'zone 2': 'SES',
-  'zone 3': 'SES',
-  'circle centre': 'SES',
-  'seshego': 'SES',
-  // Mankweng → MAN
-  'gate 1': 'MAN',
-  'gate 2': 'MAN',
-  'gate 3': 'MAN',
-  'hwiti': 'MAN',
-  'campus': 'MAN',
-  'mankweng': 'MAN'
-};
-
+<script>
 const searchInput = document.getElementById('location-search');
 const orderNowBtn = document.getElementById('order-now');
 const scheduleBtn = document.getElementById('schedule-delivery');
@@ -207,15 +180,8 @@ const resultDiv = document.getElementById('result-message');
 
 const API_URL = '/.netlify/functions/handle-order';
 
-function normalizeArea(area) {
-  return area.trim().toLowerCase();
-}
-
-function getTownshipCode(area) {
-  return TOWNSHIP_MAP[normalizeArea(area)];
-}
-
-// ✅ FIXED: Log to Heatmap with correct field name
+// ✅ REMOVED: Hardcoded TOWNSHIP_MAP (no longer needed)
+// ✅ KEPT: Heatmap logging for new areas
 async function logToHeatmap(searchTerm) {
   try {
     await fetch(API_URL, {
@@ -271,7 +237,7 @@ function generatePickupSlots() {
   return { valid: true, slots };
 }
 
-// ✅ UPDATED: Primary search using Airtable API
+// ✅ SIMPLIFIED: Only Airtable API, no fallback needed
 async function handleOrderNow() {
   const rawArea = searchInput.value.trim();
   if (!rawArea) {
@@ -280,48 +246,26 @@ async function handleOrderNow() {
   }
 
   try {
-    // 1. Try Airtable API first
+    // Use Airtable API directly
     const response = await fetch(`${API_URL}?action=searchArea&q=${encodeURIComponent(rawArea)}`);
     const data = await response.json();
     
     if (data.success && data.townshipCode) {
-      // Airtable search succeeded
+      // Found in Airtable
       sessionStorage.removeItem('deliveryMode');
       window.location.href = `hub.html?township=${data.townshipCode}`;
-      return;
-    }
-    
-    // 2. Airtable search failed, fallback to hardcoded map
-    const townshipCode = getTownshipCode(rawArea);
-    if (townshipCode) {
-      showResult('⚠️ Using backup search system...', false);
-      setTimeout(() => {
-        sessionStorage.removeItem('deliveryMode');
-        window.location.href = `hub.html?township=${townshipCode}`;
-      }, 500);
     } else {
-      // 3. Neither found - log to heatmap
+      // Not found - log to heatmap
       showResult(`Coming soon to ${rawArea}!`, true);
       logToHeatmap(rawArea);
     }
   } catch (error) {
     console.error('Search API error:', error);
-    // API failed completely, use hardcoded map
-    const townshipCode = getTownshipCode(rawArea);
-    if (townshipCode) {
-      showResult('⚠️ Search service offline. Using local data...', false);
-      setTimeout(() => {
-        sessionStorage.removeItem('deliveryMode');
-        window.location.href = `hub.html?township=${townshipCode}`;
-      }, 500);
-    } else {
-      showResult(`Coming soon to ${rawArea}!`, true);
-      logToHeatmap(rawArea);
-    }
+    showResult('Search service temporarily unavailable. Please try again.', true);
   }
 }
 
-// ✅ UPDATED: Schedule delivery also uses Airtable
+// ✅ SIMPLIFIED: Schedule delivery
 async function handleScheduleDelivery() {
   const rawArea = searchInput.value.trim();
   if (!rawArea) {
@@ -330,17 +274,10 @@ async function handleScheduleDelivery() {
   }
 
   try {
-    // Try Airtable API first
     const response = await fetch(`${API_URL}?action=searchArea&q=${encodeURIComponent(rawArea)}`);
     const data = await response.json();
     
-    let townshipCode = null;
-    if (data.success && data.townshipCode) {
-      townshipCode = data.townshipCode;
-    } else {
-      // Fallback to hardcoded map
-      townshipCode = getTownshipCode(rawArea);
-    }
+    let townshipCode = data.success ? data.townshipCode : null;
     
     if (!townshipCode) {
       showResult(`Coming soon to ${rawArea}!`, true);
@@ -364,28 +301,7 @@ async function handleScheduleDelivery() {
     }
   } catch (error) {
     console.error('Schedule search error:', error);
-    // Fallback to hardcoded map
-    const townshipCode = getTownshipCode(rawArea);
-    if (!townshipCode) {
-      showResult(`Coming soon to ${rawArea}!`, true);
-      logToHeatmap(rawArea);
-      return;
-    }
-    
-    const timeInfo = generatePickupSlots();
-    if (!timeInfo.valid) {
-      alert(timeInfo.message);
-      return;
-    }
-    
-    let message = "Next available pickup windows:\n\n";
-    message += timeInfo.slots.map(slot => `• ${slot}`).join('\n');
-    message += "\n\nFinal pickup time will be confirmed when you choose your kitchen at checkout.\n\nProceed to select your kitchen?";
-
-    if (confirm(message)) {
-      sessionStorage.setItem('deliveryMode', 'scheduled');
-      window.location.href = `hub.html?township=${townshipCode}`;
-    }
+    showResult('Schedule service temporarily unavailable.', true);
   }
 }
 
