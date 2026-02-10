@@ -163,165 +163,133 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    const API_URL = '/.netlify/functions/handle-order';
+<script>
+  const API_URL = '/.netlify/functions/handle-order';
 
-    // ✅ HARDCODED HUB CONFIGURATIONS (FALLBACK)
-    const HUB_CONFIG = {
-      'BLB': {
-        name: 'Blouberg',
-        hero: 'assets/images/image.webp',
-        slogan: 'Where Township Flavours Meet Digital Excellence',
-        color: '#e74c3c',
-        storeCountText: 'Legendary Kitchens'
-      },
-      'SES': {
-        name: 'Seshego', 
-        hero: 'assets/images/image.webp',
-        slogan: 'Street Food Royalty, Delivered to You',
-        color: '#f39c12',
-        storeCountText: 'Local Favorites'
-      },
-      'MAN': {
-        name: 'Mankweng',
-        hero: 'assets/images/image.webp', 
-        slogan: 'Campus Cravings, Satisfied Daily',
-        color: '#9b59b6',
-        storeCountText: 'Student Specials'
-      }
-    };
+  // Get township code from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const townshipCode = urlParams.get('township');
 
-    // Get township code from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const townshipCode = urlParams.get('township');
-
-    // Load hub configuration from Airtable with fallback
-    async function loadHubConfig() {
-      if (!townshipCode) {
-        alert('Invalid township. Redirecting to home...');
-        window.location.href = 'index.html';
-        return null;
-      }
-
-      try {
-        // 1. Try to load from Airtable API
-        const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
-        const data = await response.json();
-        
-        if (data.success && data.hub) {
-          console.log('✅ Loaded hub config from Airtable:', data.hub);
-          return {
-            name: data.hub.Hub_Name || data.hub.name,
-            hero: data.hub.Hero_Image_URL || data.hub.hero,
-            slogan: data.hub.Slogan || 'Local Township Flavours',
-            color: data.hub.Brand_Color || '#ff0000',
-            storeCountText: data.hub.StoreCountText || 'Local Kitchens'
-          };
-        } else {
-          throw new Error('Hub not found in Airtable');
-        }
-      } catch (error) {
-        console.warn('⚠️ Could not load from Airtable, using fallback:', error.message);
-        
-        // 2. Fallback to hardcoded config
-        if (HUB_CONFIG[townshipCode]) {
-          return HUB_CONFIG[townshipCode];
-        } else {
-          alert('Invalid township. Redirecting to home...');
-          window.location.href = 'index.html';
-          return null;
-        }
-      }
+  // Load hub configuration from Airtable
+  async function loadHubConfig() {
+    if (!townshipCode) {
+      alert('Invalid township. Redirecting to home...');
+      window.location.href = 'index.html';
+      return null;
     }
 
-    // Main initialization
-    async function initializePage() {
-      const config = await loadHubConfig();
-      if (!config) return;
-
-      // Update page with hub config
-      document.getElementById('township-name').textContent = config.name;
-      document.getElementById('footer-township').textContent = config.name.toUpperCase();
-      document.getElementById('store-count-text').textContent = config.storeCountText;
-      document.title = `${config.name} Eats — Mzanzi Eats`;
-      document.documentElement.style.setProperty('--brand-red', config.color);
+    try {
+      // Load from Airtable API
+      const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
+      const data = await response.json();
       
-      const heroSection = document.getElementById('hero-section');
-      heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('${config.hero}')`;
-      
-      // Update hero text
-      const heroTitle = document.querySelector('.hero-home .display-2');
-      heroTitle.innerHTML = `${config.slogan} <span class="brand-red">${config.name}</span>`;
-
-      // Now load stores
-      await loadStores(config);
+      if (data.success && data.hub) {
+        return {
+          name: data.hub.Hub_Name || data.hub.name || 'Township',
+          hero: data.hub.Hero_Image_URL || data.hub.hero || 'assets/images/image.webp',
+          slogan: data.hub.Slogan || 'Local Township Flavours',
+          color: data.hub.Brand_Color || '#ff0000',
+          storeCountText: data.hub.StoreCountText || 'Local Kitchens'
+        };
+      } else {
+        throw new Error('Hub not found in Airtable');
+      }
+    } catch (error) {
+      console.error('Failed to load hub config:', error);
+      alert('Could not load hub information. Redirecting to home...');
+      window.location.href = 'index.html';
+      return null;
     }
+  }
 
-    // Fetch and display stores
-    async function loadStores(config) {
-      try {
-        const response = await fetch(`${API_URL}?action=stores&township=${townshipCode}`);
-        const data = await response.json();
+  // Main initialization
+  async function initializePage() {
+    const config = await loadHubConfig();
+    if (!config) return;
 
-        if (!data.success || !data.stores || data.stores.length === 0) {
-          document.getElementById('stores-container').innerHTML = `
-            <div class="col-12 text-center py-5">
-              <h3 class="text-muted">No kitchens found in ${config.name}</h3>
-              <p class="text-muted">Check back soon!</p>
-              <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
-            </div>
-          `;
-          return;
-        }
+    // Update page with hub config
+    document.getElementById('township-name').textContent = config.name;
+    document.getElementById('footer-township').textContent = config.name.toUpperCase();
+    document.getElementById('store-count-text').textContent = config.storeCountText;
+    document.title = `${config.name} Eats — Mzanzi Eats`;
+    document.documentElement.style.setProperty('--brand-red', config.color);
+    
+    const heroSection = document.getElementById('hero-section');
+    heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.6)), url('${config.hero}')`;
+    
+    // Update hero text
+    const heroTitle = document.querySelector('.hero-home .display-2');
+    heroTitle.innerHTML = `${config.slogan} <span class="brand-red">${config.name}</span>`;
 
-        const stores = data.stores;
-        document.getElementById('store-count').textContent = stores.length;
+    // Now load stores
+    await loadStores(config.name);
+  }
 
-        // Build store cards with status badges
-        const storesHTML = stores.map(store => {
-          let statusBadge = '';
-          if (store.Temporarily_Closed && store.Status_Message) {
-            statusBadge = `<span class="badge bg-danger position-absolute" style="top:40px; left:10px; z-index:10;">${store.Status_Message}</span>`;  
-          } else if (store.Temporarily_Closed) {
-            statusBadge = `<span class="badge bg-warning position-absolute" style="top:10px; left:10px;">Temporarily Closed</span>`;
-          }
-          
-          return `
-          <div class="col-6 col-lg-3">
-            <div class="card store-card h-100 shadow-sm border-0 position-relative">
-              ${statusBadge}
-              <span class="category-badge">${store.Category || 'Food'}</span>
-              <img src="${store.Hero_Image_URL || 'assets/images/image.webp'}" 
-                   class="card-img-top" 
-                   style="height:160px; object-fit:cover;"
-                   alt="${store.Name}">
-              <div class="card-body p-3">
-                <h5 class="fw-bold mb-1">${store.Name}</h5>
-                <p class="small text-muted mb-3">${store.Slogan || 'Local Kitchen'}</p>
-                <a href="store-view.html?storeId=${store.Store_ID}&from=hub&township=${townshipCode}" 
-                   class="btn btn-dark w-100 rounded-pill">View Menu</a>
-              </div>
-            </div>
-          </div>
-          `;
-        }).join('');
+  // Fetch and display stores
+  async function loadStores(hubName) {
+    try {
+      const response = await fetch(`${API_URL}?action=stores&township=${townshipCode}`);
+      const data = await response.json();
 
-        document.getElementById('stores-container').innerHTML = storesHTML;
-
-      } catch (error) {
-        console.error('Error loading stores:', error);
+      if (!data.success || !data.stores || data.stores.length === 0) {
         document.getElementById('stores-container').innerHTML = `
           <div class="col-12 text-center py-5">
-            <h3 class="text-danger">Failed to load kitchens</h3>
-            <p class="text-muted">${error.message}</p>
+            <h3 class="text-muted">No kitchens found in ${hubName}</h3>
+            <p class="text-muted">Check back soon!</p>
             <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
           </div>
         `;
+        return;
       }
-    }
 
-    // Start the page
-    initializePage();
-  </script>
+      const stores = data.stores;
+      document.getElementById('store-count').textContent = stores.length;
+
+      // Build store cards with status badges
+      const storesHTML = stores.map(store => {
+        let statusBadge = '';
+        if (store.Temporarily_Closed && store.Status_Message) {
+          statusBadge = `<span class="badge bg-danger position-absolute" style="top:40px; left:10px; z-index:10;">${store.Status_Message}</span>`;  
+        } else if (store.Temporarily_Closed) {
+          statusBadge = `<span class="badge bg-warning position-absolute" style="top:40px; left:10px; z-index:10;">Temporarily Closed</span>`;
+        }
+        
+        return `
+        <div class="col-6 col-lg-3">
+          <div class="card store-card h-100 shadow-sm border-0 position-relative">
+            ${statusBadge}
+            <span class="category-badge">${store.Category || 'Food'}</span>
+            <img src="${store.Hero_Image_URL || 'assets/images/image.webp'}" 
+                 class="card-img-top" 
+                 style="height:160px; object-fit:cover;"
+                 alt="${store.Name}">
+            <div class="card-body p-3">
+              <h5 class="fw-bold mb-1">${store.Name}</h5>
+              <p class="small text-muted mb-3">${store.Slogan || 'Local Kitchen'}</p>
+              <a href="store-view.html?storeId=${store.Store_ID}&from=hub&township=${townshipCode}" 
+                 class="btn btn-dark w-100 rounded-pill">View Menu</a>
+            </div>
+          </div>
+        </div>
+        `;
+      }).join('');
+
+      document.getElementById('stores-container').innerHTML = storesHTML;
+
+    } catch (error) {
+      console.error('Error loading stores:', error);
+      document.getElementById('stores-container').innerHTML = `
+        <div class="col-12 text-center py-5">
+          <h3 class="text-danger">Failed to load kitchens</h3>
+          <p class="text-muted">${error.message}</p>
+          <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
+        </div>
+      `;
+    }
+  }
+
+  // Start the page
+  initializePage();
+</script> 
 </body>
 </html>
