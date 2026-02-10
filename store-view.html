@@ -238,7 +238,7 @@
         <span id="cart-count" class="badge" style="background-color: var(--brand-red);">0</span> <span class="text-muted">items</span>
         <div class="fw-bold fs-4 text-dark" id="cart-total">R0.00</div>
       </div>
-      <span class="view-cart-arrow">VIEW CART →</span>
+      <span class="view-cart-arrow">🛒 CHECKOUT (${cart.length} items) →</span>
     </div>
   </div>
 
@@ -367,6 +367,19 @@
       if (!store) {
         document.getElementById('store-name').textContent = 'Store not found';
         return;
+      }
+
+      // ✅ ADD THIS: Check if store is temporarily closed
+      if (store.Temporarily_Closed) {
+        // Show closure alert in hero section
+        const heroContent = document.querySelector('.hero-content');
+        heroContent.innerHTML += `
+          <div class="alert alert-danger mt-4" role="alert">
+            <h4>🚫 Temporarily Closed</h4>
+            <p>${store.Status_Message || 'This kitchen is closed at the moment.'}</p>
+            <p class="mb-0"><strong>You can view the menu but cannot place orders.</strong></p>
+          </div>
+        `;
       }
 
       document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
@@ -518,8 +531,14 @@
       });
 
       // ✅ FIXED CHECKOUT: Correct field names for Airtable
-      document.getElementById('checkout-btn').addEventListener('click', function() {
-        if (cart.length === 0) return;
+        document.getElementById('checkout-btn').addEventListener('click', function() {
+      // ✅ ADD THIS: Block checkout if store is closed
+      if (store.Temporarily_Closed) {
+        alert(`🚫 ${store.Name} is Temporarily Closed\n\n${store.Status_Message || 'Orders are not being accepted at this time. Please check back later or try another kitchen.'}`);
+        return;
+      }
+      
+      if (cart.length === 0) return;
 
         const modal = document.createElement('div');
         modal.id = 'pickup-modal';

@@ -181,18 +181,25 @@
     try {
       // Load from Airtable API
       const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.success && data.hub) {
+        console.log('✅ Loaded hub config:', data.hub);
+        // Use correct Airtable field names (Township_Code, Hub_Name are Long Text)
         return {
-          name: data.hub.Hub_Name || data.hub.name || 'Township',
+          name: data.hub.Hub_Name || data.hub.name || townshipCode,
           hero: data.hub.Hero_Image_URL || data.hub.hero || 'assets/images/image.webp',
-          slogan: data.hub.Slogan || 'Local Township Flavours',
+          slogan: data.hub.Slogan || `Local ${townshipCode} Flavours`,
           color: data.hub.Brand_Color || '#ff0000',
           storeCountText: data.hub.StoreCountText || 'Local Kitchens'
         };
       } else {
-        throw new Error('Hub not found in Airtable');
+        throw new Error('Hub not found in Airtable response');
       }
     } catch (error) {
       console.error('Failed to load hub config:', error);
@@ -290,6 +297,6 @@
 
   // Start the page
   initializePage();
-</script> 
+</script>
 </body>
 </html>
