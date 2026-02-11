@@ -64,7 +64,7 @@ exports.handler = async (event) => {
         };
       }
 
-      // 3. SEARCH AREA
+      // 3. SEARCH AREA - FIXED: Gets ALL stores (no filter)
       if (action === 'searchArea') {
         const searchTerm = queryStringParameters?.q?.toLowerCase().trim();
         if (!searchTerm) {
@@ -74,22 +74,20 @@ exports.handler = async (event) => {
           };
         }
 
-        // Get ALL stores
-        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent("{Is_Active} = 'checked'")}`;
+        // Get ALL stores - no filter
+        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
         const allStores = data.records?.map(r => r.fields) || [];
 
         let foundTownshipCode = null;
         for (const store of allStores) {
-       // Handle both array (Multiple Select) and string formats
-let aliasList = [];
-if (Array.isArray(store.Location_Aliases)) {
-  aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
-} else if (typeof store.Location_Aliases === 'string') {
-  aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
-}
-// If field is empty/null, aliasList stays empty array
+          let aliasList = [];
+          if (Array.isArray(store.Location_Aliases)) {
+            aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
+          } else if (typeof store.Location_Aliases === 'string') {
+            aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
+          }
           
           if (aliasList.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
@@ -167,7 +165,6 @@ if (Array.isArray(store.Location_Aliases)) {
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        // Log to Airtable
         try {
           await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
             method: 'POST',
