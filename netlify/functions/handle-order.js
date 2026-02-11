@@ -77,8 +77,14 @@ exports.handler = async (event) => {
 
         let foundTownshipCode = null;
         for (const store of allStores) {
-          const aliases = store.Location_Aliases || '';
-          const aliasList = aliases.split(',').map(a => a.trim().toLowerCase());
+       // Handle both array (Multiple Select) and string formats
+let aliasList = [];
+if (Array.isArray(store.Location_Aliases)) {
+  aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
+} else if (typeof store.Location_Aliases === 'string') {
+  aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
+}
+// If field is empty/null, aliasList stays empty array
           
           if (aliasList.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
