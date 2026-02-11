@@ -29,7 +29,7 @@
     .brand-red { color: var(--brand-red); }
     .hero-home {
       background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), 
-   
+                  center/cover no-repeat;
       height: 80vh;
       display: flex;
       align-items: center;
@@ -166,12 +166,11 @@
   <script>
     const API_URL = '/.netlify/functions/handle-order';
 
-
     // Get township code from URL
     const urlParams = new URLSearchParams(window.location.search);
     const townshipCode = urlParams.get('township');
 
-    // Load hub configuration from Airtable with fallback
+    // Load hub configuration from Airtable
     async function loadHubConfig() {
       if (!townshipCode) {
         alert('Invalid township. Redirecting to home...');
@@ -180,7 +179,6 @@
       }
 
       try {
-        // 1. Try to load from Airtable API
         const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
         const data = await response.json();
         
@@ -194,22 +192,16 @@
             storeCountText: data.hub.StoreCountText || 'Local Kitchens'
           };
         } else {
-      console.warn('Hub not found for township:', townshipCode);
-      alert(`Township "${townshipCode}" not found. Redirecting to home...`);
-      window.location.href = 'index.html';
-      return null;
-    }
-      } catch (error) {
-        console.warn('⚠️ Could not load from Airtable, using fallback:', error.message);
-        
-        // 2. Fallback to hardcoded config
-        if (HUB_CONFIG[townshipCode]) {
-          return HUB_CONFIG[townshipCode];
-        } else {
-          alert('Invalid township. Redirecting to home...');
+          console.warn('Hub not found for township:', townshipCode);
+          alert(`Township "${townshipCode}" not found. Redirecting to home...`);
           window.location.href = 'index.html';
           return null;
         }
+      } catch (error) {
+        console.error('❌ Error loading hub:', error);
+        alert('Error loading township. Returning to home...');
+        window.location.href = 'index.html';
+        return null;
       }
     }
 
@@ -250,6 +242,7 @@
               <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
             </div>
           `;
+          document.getElementById('store-count').textContent = '0';
           return;
         }
 
@@ -303,4 +296,4 @@
     initializePage();
   </script>
 </body>
-</html>            
+</html>
