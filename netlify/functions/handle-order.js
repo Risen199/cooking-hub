@@ -18,7 +18,7 @@ exports.handler = async (event) => {
     if (httpMethod === 'GET') {
       const action = queryStringParameters?.action;
 
-      // 1. GET STORES
+      // 1. GET STORES - FIXED: Only one filter
       if (action === 'stores') {
         const township = queryStringParameters?.township;
         let formula = "{Is_Active} = 'checked'";
@@ -27,11 +27,6 @@ exports.handler = async (event) => {
         }
         const encodedFormula = encodeURIComponent(formula);
         const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodedFormula}`;
-        
-        if (township) {
-          const formula = encodeURIComponent(`{Township_Code} = '${township}'`);
-          url += `?filterByFormula=${formula}`;
-        }
         
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
@@ -74,7 +69,7 @@ exports.handler = async (event) => {
           };
         }
 
-        // Get ALL stores
+        // Get ONLY active stores
         const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent("{Is_Active} = 'checked'")}`;
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
@@ -82,14 +77,12 @@ exports.handler = async (event) => {
 
         let foundTownshipCode = null;
         for (const store of allStores) {
-       // Handle both array (Multiple Select) and string formats
-let aliasList = [];
-if (Array.isArray(store.Location_Aliases)) {
-  aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
-} else if (typeof store.Location_Aliases === 'string') {
-  aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
-}
-// If field is empty/null, aliasList stays empty array
+          let aliasList = [];
+          if (Array.isArray(store.Location_Aliases)) {
+            aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
+          } else if (typeof store.Location_Aliases === 'string') {
+            aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
+          }
           
           if (aliasList.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
@@ -110,7 +103,7 @@ if (Array.isArray(store.Location_Aliases)) {
         }
       }
 
-      // 4. GET HUB CONFIG
+      // 4. GET HUB CONFIG - FIXED: Removed Is_Active filter
       if (action === 'getHub') {
         const townshipCode = queryStringParameters?.township;
         if (!townshipCode) {
@@ -120,7 +113,7 @@ if (Array.isArray(store.Location_Aliases)) {
           };
         }
 
-        const formula = encodeURIComponent(`AND({Township_Code} = '${townshipCode}', {Is_Active} = 'checked')`);
+        const formula = encodeURIComponent(`{Township_Code} = '${townshipCode}'`);
         const url = `https://api.airtable.com/v0/${BASE_ID}/tblTBMwzYMzS8EIYx?filterByFormula=${formula}`;
         
         const res = await fetch(url, { headers: HEADERS });
@@ -167,7 +160,6 @@ if (Array.isArray(store.Location_Aliases)) {
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        // Log to Airtable
         try {
           await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
             method: 'POST',
