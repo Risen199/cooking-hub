@@ -29,7 +29,7 @@
     .brand-red { color: var(--brand-red); }
     .hero-home {
       background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), 
-      center/cover no-repeat;
+   
       height: 80vh;
       display: flex;
       align-items: center;
@@ -200,11 +200,17 @@
       return null;
     }
       } catch (error) {
-      console.error('❌ Error loading hub:', error);
-      alert('Error loading township. Returning to home...');
-      window.location.href = 'index.html';
-      return null;
-    }
+        console.warn('⚠️ Could not load from Airtable, using fallback:', error.message);
+        
+        // 2. Fallback to hardcoded config
+        if (HUB_CONFIG[townshipCode]) {
+          return HUB_CONFIG[townshipCode];
+        } else {
+          alert('Invalid township. Redirecting to home...');
+          window.location.href = 'index.html';
+          return null;
+        }
+      }
     }
 
     // Main initialization
@@ -297,4 +303,4 @@
     initializePage();
   </script>
 </body>
-</html>
+</html>            
