@@ -127,7 +127,7 @@ exports.handler = async (event) => {
           };
         } else {
           return {
-            statusCode: 404,
+            statusCode: 200,
             body: JSON.stringify({ success: false, error: 'Hub not found' })
           };
         }
