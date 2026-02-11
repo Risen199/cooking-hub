@@ -18,7 +18,7 @@ exports.handler = async (event) => {
     if (httpMethod === 'GET') {
       const action = queryStringParameters?.action;
 
-      // 1. GET STORES - DO NOT TOUCH! This pattern works
+      // 1. GET STORES
       if (action === 'stores') {
         const township = queryStringParameters?.township;
         let formula = "{Is_Active} = 'checked'";
@@ -74,7 +74,7 @@ exports.handler = async (event) => {
           };
         }
 
-        // Get ALL active stores
+        // Get ALL stores
         const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent("{Is_Active} = 'checked'")}`;
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
@@ -82,12 +82,14 @@ exports.handler = async (event) => {
 
         let foundTownshipCode = null;
         for (const store of allStores) {
-          let aliasList = [];
-          if (Array.isArray(store.Location_Aliases)) {
-            aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
-          } else if (typeof store.Location_Aliases === 'string') {
-            aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
-          }
+       // Handle both array (Multiple Select) and string formats
+let aliasList = [];
+if (Array.isArray(store.Location_Aliases)) {
+  aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
+} else if (typeof store.Location_Aliases === 'string') {
+  aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
+}
+// If field is empty/null, aliasList stays empty array
           
           if (aliasList.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
@@ -165,6 +167,7 @@ exports.handler = async (event) => {
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
+        // Log to Airtable
         try {
           await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
             method: 'POST',
