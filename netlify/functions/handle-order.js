@@ -21,7 +21,12 @@ exports.handler = async (event) => {
       // 1. GET STORES
       if (action === 'stores') {
         const township = queryStringParameters?.township;
-        let url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
+        let formula = "{Is_Active} = 'checked'";
+        if (township) {
+          formula = `AND(${formula}, {Township_Code} = '${township}')`;
+        }
+        const encodedFormula = encodeURIComponent(formula);
+        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodedFormula}`;
         
         if (township) {
           const formula = encodeURIComponent(`{Township_Code} = '${township}'`);
@@ -70,7 +75,7 @@ exports.handler = async (event) => {
         }
 
         // Get ALL stores
-        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
+        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent("{Is_Active} = 'checked'")}`;
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
         const allStores = data.records?.map(r => r.fields) || [];
@@ -115,7 +120,7 @@ if (Array.isArray(store.Location_Aliases)) {
           };
         }
 
-        const formula = encodeURIComponent(`{Township_Code} = '${townshipCode}'`);
+        const formula = encodeURIComponent(`AND({Township_Code} = '${townshipCode}', {Is_Active} = 'checked')`);
         const url = `https://api.airtable.com/v0/${BASE_ID}/tblTBMwzYMzS8EIYx?filterByFormula=${formula}`;
         
         const res = await fetch(url, { headers: HEADERS });
