@@ -1,4 +1,4 @@
-// netlify/functions/handle-order.js
+ // netlify/functions/handle-order.js
 
 const fetch = globalThis.fetch || require('node-fetch');
 
@@ -21,7 +21,12 @@ exports.handler = async (event) => {
       // 1. GET STORES
       if (action === 'stores') {
         const township = queryStringParameters?.township;
-        let url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
+        let formula = "{Is_Active} = 'checked'";
+        if (township) {
+          formula = `AND(${formula}, {Township_Code} = '${township}')`;
+        }
+        const encodedFormula = encodeURIComponent(formula);
+        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodedFormula}`;
         
         if (township) {
           const formula = encodeURIComponent(`{Township_Code} = '${township}'`);
@@ -69,19 +74,22 @@ exports.handler = async (event) => {
           };
         }
 
-        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
+        // Get ALL stores
+        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent("{Is_Active} = 'checked'")}`;
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
         const allStores = data.records?.map(r => r.fields) || [];
 
         let foundTownshipCode = null;
         for (const store of allStores) {
-          let aliasList = [];
-          if (Array.isArray(store.Location_Aliases)) {
-            aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
-          } else if (typeof store.Location_Aliases === 'string') {
-            aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
-          }
+       // Handle both array (Multiple Select) and string formats
+let aliasList = [];
+if (Array.isArray(store.Location_Aliases)) {
+  aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
+} else if (typeof store.Location_Aliases === 'string') {
+  aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
+}
+// If field is empty/null, aliasList stays empty array
           
           if (aliasList.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
@@ -112,7 +120,7 @@ exports.handler = async (event) => {
           };
         }
 
-        const formula = encodeURIComponent(`{Township_Code} = '${townshipCode}'`);
+        const formula = encodeURIComponent(`AND({Township_Code} = '${townshipCode}', {Is_Active} = 'checked')`);
         const url = `https://api.airtable.com/v0/${BASE_ID}/tblTBMwzYMzS8EIYx?filterByFormula=${formula}`;
         
         const res = await fetch(url, { headers: HEADERS });
@@ -126,7 +134,7 @@ exports.handler = async (event) => {
           };
         } else {
           return {
-            statusCode: 200,
+            statusCode: 404,
             body: JSON.stringify({ success: false, error: 'Hub not found' })
           };
         }
@@ -159,6 +167,7 @@ exports.handler = async (event) => {
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
+        // Log to Airtable
         try {
           await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
             method: 'POST',
