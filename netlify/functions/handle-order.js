@@ -21,12 +21,7 @@ exports.handler = async (event) => {
       // 1. GET STORES
       if (action === 'stores') {
         const township = queryStringParameters?.township;
-        let formula = "{Is_Active} = 'checked'";
-        if (township) {
-          formula = `AND(${formula}, {Township_Code} = '${township}')`;
-        }
-        const encodedFormula = encodeURIComponent(formula);
-        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodedFormula}`;
+        let url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
         
         if (township) {
           const formula = encodeURIComponent(`{Township_Code} = '${township}'`);
@@ -64,7 +59,7 @@ exports.handler = async (event) => {
         };
       }
 
-      // 3. SEARCH AREA - FIXED: Gets ALL stores (no filter)
+      // 3. SEARCH AREA
       if (action === 'searchArea') {
         const searchTerm = queryStringParameters?.q?.toLowerCase().trim();
         if (!searchTerm) {
@@ -74,7 +69,6 @@ exports.handler = async (event) => {
           };
         }
 
-        // Get ALL stores - no filter
         const url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
         const res = await fetch(url, { headers: HEADERS });
         const data = await res.json();
@@ -118,7 +112,7 @@ exports.handler = async (event) => {
           };
         }
 
-        const formula = encodeURIComponent(`AND({Township_Code} = '${townshipCode}', {Is_Active} = 'checked')`);
+        const formula = encodeURIComponent(`{Township_Code} = '${townshipCode}'`);
         const url = `https://api.airtable.com/v0/${BASE_ID}/tblTBMwzYMzS8EIYx?filterByFormula=${formula}`;
         
         const res = await fetch(url, { headers: HEADERS });
@@ -132,7 +126,7 @@ exports.handler = async (event) => {
           };
         } else {
           return {
-            statusCode: 404,
+            statusCode: 200,
             body: JSON.stringify({ success: false, error: 'Hub not found' })
           };
         }
