@@ -4,8 +4,8 @@ const fetch = globalThis.fetch || require('node-fetch');
 
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body } = event;
-  const BASE_ID = process.env.AIRTABLE_BASE_ID || 'appoP1ZMDdmvT6FS9';
-const TOKEN = process.env.AIRTABLE_TOKEN;
+   const BASE_ID = 'appoP1ZMDdmvT6FS9';
+   const TOKEN = 'patt5rEogpO4GBF3J.62aa651a0d72ee5bf4e59d99eeada69912249c6b3760158cec086da40a776465';
 
 // Add safety check
 if (!TOKEN) {
