@@ -4,21 +4,9 @@ const fetch = globalThis.fetch || require('node-fetch');
 
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body } = event;
-   const BASE_ID = 'appoP1ZMDdmvT6FS9';
-   const TOKEN = 'patt5rEogpO4GBF3J.62aa651a0d72ee5bf4e59d99eeada69912249c6b3760158cec086da40a776465';
+  const BASE_ID = 'appoP1ZMDdmvT6FS9';
+  const TOKEN = 'patt5rEogpO4GBF3J.62aa651a0d72ee5bf4e59d99eeada69912249c6b3760158cec086da40a776465';
 
-// Add safety check
-if (!TOKEN) {
-  console.error('❌ AIRTABLE_TOKEN missing');
-  return {
-    statusCode: 500,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      success: false, 
-      error: 'Server configuration error'
-    })
-  };
-}
   const HEADERS = {
     'Authorization': `Bearer ${TOKEN}`,
     'Content-Type': 'application/json'
@@ -47,19 +35,18 @@ if (!TOKEN) {
         
         // Map records to include the new fields
         const stores = data.records?.map(r => {
-        const fields = r.fields;
-        // Convert Location_Aliases array to string for frontend compatibility
-        const locationAliases = Array.isArray(fields.Location_Aliases) 
-          ? fields.Location_Aliases.join(',')
-          : fields.Location_Aliases || '';
+          const fields = r.fields;
+          const locationAliases = Array.isArray(fields.Location_Aliases) 
+            ? fields.Location_Aliases.join(',')
+            : fields.Location_Aliases || '';
           
-        return {
-          ...fields,
-          Location_Aliases: locationAliases, // Ensure string format
-          Temporarily_Closed: fields.Temporarily_Closed || false,
-          Status_Message: fields.Status_Message || ''
-        };
-      }) || [];
+          return {
+            ...fields,
+            Location_Aliases: locationAliases,
+            Temporarily_Closed: fields.Temporarily_Closed || false,
+            Status_Message: fields.Status_Message || ''
+          };
+        }) || [];
         
         return {
           statusCode: 200,
@@ -68,7 +55,7 @@ if (!TOKEN) {
         };
       }
 
-      // Fetch menu for specific store (NO CHANGES)
+      // Fetch menu for specific store
       if (action === 'menu') {
         const storeId = queryStringParameters.storeId;
         if (!storeId) {
@@ -98,24 +85,20 @@ if (!TOKEN) {
           };
         }
 
-        // Fetch ALL active stores
-        const allStoresUrl = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent('OR({Is_Active} = TRUE(), {Is_Active} = "")')}`;
+        // 🔴🔴🔴 FIXED LINE 85: Changed from 'TRUE()' to match line 15 🔴🔴🔴
+        const allStoresUrl = `https://api.airtable.com/v0/${BASE_ID}/Stores?filterByFormula=${encodeURIComponent("{Is_Active} = 'checked'")}`;
         const storesRes = await fetch(allStoresUrl, { headers: HEADERS });
         const storesData = await storesRes.json();
         const allStores = storesData.records?.map(r => r.fields) || [];
 
-        // Find store where searchTerm matches any Location_Aliases
         let foundTownshipCode = null;
         for (const store of allStores) {
           let aliases = [];
-if (Array.isArray(store.Location_Aliases)) {
-  // Multiple Select field returns array
-  aliases = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
-} else if (typeof store.Location_Aliases === 'string') {
-  // Text field returns string (backward compatibility)
-  aliases = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
-}
-// If field is empty/null, aliases stays empty array
+          if (Array.isArray(store.Location_Aliases)) {
+            aliases = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
+          } else if (typeof store.Location_Aliases === 'string') {
+            aliases = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
+          }
 
           if (aliases && aliases.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
