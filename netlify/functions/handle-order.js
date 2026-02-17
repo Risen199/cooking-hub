@@ -176,27 +176,36 @@ exports.handler = async (event) => {
         };
       }
 
-      // CREATE ORDER
-      if (data.action === 'order') {
-        const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
-        const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
-        const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
+      // CREATE ORDER     
+    if (data.action === 'order') {
+      const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
+      const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
+      const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        // FIXED: Using SA timestamp
-        const { error } = await supabase
-          .from('Messages')
-          .insert([{
-            Message_ID: 'msg_' + Date.now(),
-            Store_ID: data.Store_ID || 'unknown',
-            Customer_Name: data.Customer_Name || 'Customer',
-            Order_Items: data.Order_Items || 'No items',
-            Total_Amount: data.Total_Amount || 0,
-            Pickup_Window: data.Pickup_Window || 'ASAP',
-            Delivery_Type: data.Delivery_Type || 'Collection',
-            Status: 'Ordered',
-            Timestamp: getSATimestamp(),
-            Source: 'Website'
-          }]);
+  // ✅ CALCULATE COMMISSIONS
+  const totalAmount = Number(data.Total_Amount) || 0;
+  const commissionPool = Number((totalAmount * 0.15).toFixed(2));
+  const promoterCommission = Number((commissionPool * 0.3).toFixed(2));
+  const companyCommission = Number((commissionPool * 0.7).toFixed(2));
+
+  // Log to Messages table with calculated commissions
+  const { error } = await supabase
+    .from('Messages')
+    .insert([{
+      Message_ID: 'msg_' + Date.now(),
+      Store_ID: data.Store_ID || 'unknown',
+      Customer_Name: data.Customer_Name || 'Customer',
+      Order_Items: data.Order_Items || 'No items',
+      Total_Amount: totalAmount,
+      Commission_Pool: commissionPool,
+      Promoter_Commission: promoterCommission,
+      Company_Commission: companyCommission,
+      Pickup_Window: data.Pickup_Window || 'ASAP',
+      Delivery_Type: data.Delivery_Type || 'Collection',
+      Status: 'Ordered',
+      Timestamp: getSATimestamp(),
+      Source: 'Website'
+    }]);
 
         if (error) {
           console.error('Messages insert error:', error);
