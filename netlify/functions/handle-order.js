@@ -7,6 +7,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Helper function for South African timestamp
+const getSATimestamp = () => {
+  return new Date().toLocaleString('en-ZA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).replace(/[/]/g, '-').replace(/, /g, ' ');
+};
+
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body } = event;
 
@@ -22,7 +36,7 @@ exports.handler = async (event) => {
         let query = supabase
           .from('Stores')
           .select('*')
-          .eq('Is_Active', true);  // Only active stores
+          .eq('Is_Active', true);
         
         if (township) {
           query = query.eq('Township_Code', township);
@@ -72,7 +86,6 @@ exports.handler = async (event) => {
           };
         }
 
-        // Get all stores
         const { data: allStores, error } = await supabase
           .from('Stores')
           .select('Township_Code, Location_Aliases');
@@ -82,10 +95,7 @@ exports.handler = async (event) => {
         let foundTownshipCode = null;
         
         for (const store of allStores || []) {
-          // Handle Location_Aliases as array (from PostgreSQL)
           const aliasList = store.Location_Aliases || [];
-          
-          // Convert all to lowercase strings for comparison
           const normalizedAliases = aliasList.map(a => String(a).toLowerCase().trim());
           
           if (normalizedAliases.includes(searchTerm)) {
@@ -147,14 +157,18 @@ exports.handler = async (event) => {
       if (data.action === 'logHeatmap') {
         const searchTerm = data.Search_Term || '';
         
+        // FIXED: Using correct column names and SA timestamp
         const { error } = await supabase
           .from('Heatmap')
           .insert([{ 
             Search_Term: searchTerm,
-            Timestamp: new Date().toISOString()
+            Timestamp: getSATimestamp()
           }]);
         
-        if (error) throw error;
+        if (error) {
+          console.error('Heatmap insert error:', error);
+          // Don't throw - we still want to return success to user
+        }
         
         return { 
           statusCode: 200, 
@@ -168,7 +182,7 @@ exports.handler = async (event) => {
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        // Log to Messages table
+        // FIXED: Using SA timestamp
         const { error } = await supabase
           .from('Messages')
           .insert([{
@@ -180,12 +194,13 @@ exports.handler = async (event) => {
             Pickup_Window: data.Pickup_Window || 'ASAP',
             Delivery_Type: data.Delivery_Type || 'Collection',
             Status: 'Ordered',
-            Timestamp: new Date().toISOString(),
+            Timestamp: getSATimestamp(),
             Source: 'Website'
           }]);
 
         if (error) {
-          console.log('Supabase log failed, but WhatsApp will still work:', error);
+          console.error('Messages insert error:', error);
+          // WhatsApp still works even if logging fails
         }
 
         return { 
