@@ -1,61 +1,64 @@
 // netlify/functions/handle-order.js
+const { createClient } = require('@supabase/supabase-js');
 
-const fetch = globalThis.fetch || require('node-fetch');
+// Initialize Supabase with environment variables
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body } = event;
-  
-  // ✅ SIMPLE: Hardcode everything - no env vars
-  const BASE_ID = 'appoP1ZMDdmvT6FS9';
-  const TOKEN = 'patt5rEogpO4GBF3J.62aa651a0d72ee5bf4e59d99eeada69912249c6b3760158cec086da40a776465';
-  
-  const HEADERS = {
-    'Authorization': `Bearer ${TOKEN}`,
-    'Content-Type': 'application/json'
-  };
 
   try {
+    // GET REQUESTS
     if (httpMethod === 'GET') {
       const action = queryStringParameters?.action;
 
       // 1. GET STORES
       if (action === 'stores') {
         const township = queryStringParameters?.township;
-        let url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
+        
+        let query = supabase
+          .from('Stores')
+          .select('*')
+          .eq('Is_Active', true);  // Only active stores
         
         if (township) {
-          const formula = encodeURIComponent(`{Township_Code} = '${township}'`);
-          url += `?filterByFormula=${formula}`;
+          query = query.eq('Township_Code', township);
         }
         
-        const res = await fetch(url, { headers: HEADERS });
-        const data = await res.json();
-        const stores = data.records?.map(r => r.fields) || [];
+        const { data: stores, error } = await query;
+        
+        if (error) throw error;
         
         return {
           statusCode: 200,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: true, stores })
+          body: JSON.stringify({ success: true, stores: stores || [] })
         };
       }
 
       // 2. GET MENU
       if (action === 'menu') {
         const storeId = queryStringParameters.storeId;
-        if (!storeId) return { 
-          statusCode: 400, 
-          body: JSON.stringify({ success: false, error: 'Missing storeId' }) 
-        };
+        if (!storeId) {
+          return { 
+            statusCode: 400, 
+            body: JSON.stringify({ success: false, error: 'Missing storeId' }) 
+          };
+        }
         
-        const formula = encodeURIComponent(`{Store_ID} = '${storeId}'`);
-        const url = `https://api.airtable.com/v0/${BASE_ID}/Menu?filterByFormula=${formula}`;
-        const res = await fetch(url, { headers: HEADERS });
-        const data = await res.json();
-        const menu = data.records?.map(r => r.fields) || [];
+        const { data: menu, error } = await supabase
+          .from('Menu')
+          .select('*')
+          .eq('Store_ID', storeId);
+        
+        if (error) throw error;
         
         return { 
           statusCode: 200, 
-          body: JSON.stringify({ success: true, menu }) 
+          body: JSON.stringify({ success: true, menu: menu || [] }) 
         };
       }
 
@@ -69,21 +72,23 @@ exports.handler = async (event) => {
           };
         }
 
-        const url = `https://api.airtable.com/v0/${BASE_ID}/Stores`;
-        const res = await fetch(url, { headers: HEADERS });
-        const data = await res.json();
-        const allStores = data.records?.map(r => r.fields) || [];
+        // Get all stores
+        const { data: allStores, error } = await supabase
+          .from('Stores')
+          .select('Township_Code, Location_Aliases');
+        
+        if (error) throw error;
 
         let foundTownshipCode = null;
-        for (const store of allStores) {
-          let aliasList = [];
-          if (Array.isArray(store.Location_Aliases)) {
-            aliasList = store.Location_Aliases.map(a => String(a).toLowerCase().trim());
-          } else if (typeof store.Location_Aliases === 'string') {
-            aliasList = store.Location_Aliases.split(',').map(a => a.trim().toLowerCase());
-          }
+        
+        for (const store of allStores || []) {
+          // Handle Location_Aliases as array (from PostgreSQL)
+          const aliasList = store.Location_Aliases || [];
           
-          if (aliasList.includes(searchTerm)) {
+          // Convert all to lowercase strings for comparison
+          const normalizedAliases = aliasList.map(a => String(a).toLowerCase().trim());
+          
+          if (normalizedAliases.includes(searchTerm)) {
             foundTownshipCode = store.Township_Code;
             break;
           }
@@ -112,17 +117,18 @@ exports.handler = async (event) => {
           };
         }
 
-        const formula = encodeURIComponent(`{Township_Code} = '${townshipCode}'`);
-        const url = `https://api.airtable.com/v0/${BASE_ID}/tblTBMwzYMzS8EIYx?filterByFormula=${formula}`;
+        const { data: hubs, error } = await supabase
+          .from('Hub_Configs')
+          .select('*')
+          .eq('Township_Code', townshipCode)
+          .limit(1);
         
-        const res = await fetch(url, { headers: HEADERS });
-        const data = await res.json();
+        if (error) throw error;
         
-        if (data.records.length > 0) {
-          const hubConfig = data.records[0].fields;
+        if (hubs && hubs.length > 0) {
           return {
             statusCode: 200,
-            body: JSON.stringify({ success: true, hub: hubConfig })
+            body: JSON.stringify({ success: true, hub: hubs[0] })
           };
         } else {
           return {
@@ -137,49 +143,49 @@ exports.handler = async (event) => {
     if (httpMethod === 'POST') {
       const data = JSON.parse(body);
 
+      // LOG HEATMAP SEARCH
       if (data.action === 'logHeatmap') {
         const searchTerm = data.Search_Term || '';
-        const response = await fetch(`https://api.airtable.com/v0/${BASE_ID}/Heatmap`, {
-          method: 'POST',
-          headers: HEADERS,
-          body: JSON.stringify({
-            records: [{ fields: { 'Search_Term': searchTerm } }]
-          })
-        });
         
-        const result = await response.json();
+        const { error } = await supabase
+          .from('Heatmap')
+          .insert([{ 
+            Search_Term: searchTerm,
+            Timestamp: new Date().toISOString()
+          }]);
+        
+        if (error) throw error;
+        
         return { 
           statusCode: 200, 
-          body: JSON.stringify({ success: response.ok, airtableResponse: result }) 
+          body: JSON.stringify({ success: true }) 
         };
       }
 
+      // CREATE ORDER
       if (data.action === 'order') {
         const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-        try {
-          await fetch(`https://api.airtable.com/v0/${BASE_ID}/Messages`, {
-            method: 'POST',
-            headers: HEADERS,
-            body: JSON.stringify({
-              records: [{
-                fields: {
-                  Message_ID: 'msg_' + Date.now(),
-                  Store_ID: data.Store_ID || 'unknown',
-                  Customer_Name: data.Customer_Name || 'Customer',
-                  Order_Items: data.Order_Items || 'No items',
-                  Total_Amount: data.Total_Amount || 0,
-                  Pickup_Window: data.Pickup_Window || 'ASAP',
-                  Delivery_Type: data.Delivery_Type || 'Collection',
-                  Status: 'Ordered'
-                }
-              }]
-            })
-          });
-        } catch (err) {
-          console.log('Airtable log failed, but WhatsApp will still work');
+        // Log to Messages table
+        const { error } = await supabase
+          .from('Messages')
+          .insert([{
+            Message_ID: 'msg_' + Date.now(),
+            Store_ID: data.Store_ID || 'unknown',
+            Customer_Name: data.Customer_Name || 'Customer',
+            Order_Items: data.Order_Items || 'No items',
+            Total_Amount: data.Total_Amount || 0,
+            Pickup_Window: data.Pickup_Window || 'ASAP',
+            Delivery_Type: data.Delivery_Type || 'Collection',
+            Status: 'Ordered',
+            Timestamp: new Date().toISOString(),
+            Source: 'Website'
+          }]);
+
+        if (error) {
+          console.log('Supabase log failed, but WhatsApp will still work:', error);
         }
 
         return { 
