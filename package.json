@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/Risen199/cooking-hub#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "node-fetch": "^3.3.2"
   }
 }
