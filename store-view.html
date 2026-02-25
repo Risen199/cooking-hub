@@ -424,7 +424,7 @@
                 data-name="${item.Item_Name}" 
                 data-price="${item.Price}"
                 data-description="${item.Description || 'Delicious meal'}">
-              <img src="${item.Image_URL || 'assets/images/image.webp'}" 
+              <img src="${item.Hero_Image_URL || 'assets/images/image.webp'}" 
                   class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
               <h6 class="fw-bold">${item.Item_Name}</h6>
               <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
