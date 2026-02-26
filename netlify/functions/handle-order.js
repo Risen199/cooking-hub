@@ -29,37 +29,29 @@ exports.handler = async (event) => {
     if (httpMethod === 'GET') {
       const action = queryStringParameters?.action;
 
-      // 1. GET STORES - UPDATED WITH SLUG FIELD
-if (action === 'stores') {
-  const township = queryStringParameters?.township;
-  
-  let query = supabase
-    .from('Stores')
-    .select('*')
-    .eq('Is_Active', true);
-  
-  if (township) {
-    query = query.eq('Township_Code', township);
-  }
-  
-  const { data: stores, error } = await query;
-  
-  if (error) throw error;
-  
-  // Ensure slug field is included (it should already be there from your DB)
-  // But we'll log to verify
-  console.log('Stores fetched with slugs:', stores?.map(s => ({ 
-    id: s.Store_ID, 
-    name: s.Name, 
-    slug: s.slug 
-  })));
-  
-  return {
-    statusCode: 200,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ success: true, stores: stores || [] })
-  };
-}
+      // 1. GET STORES
+      if (action === 'stores') {
+        const township = queryStringParameters?.township;
+        
+        let query = supabase
+          .from('Stores')
+          .select('*')
+          .eq('Is_Active', true);
+        
+        if (township) {
+          query = query.eq('Township_Code', township);
+        }
+        
+        const { data: stores, error } = await query;
+        
+        if (error) throw error;
+        
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ success: true, stores: stores || [] })
+        };
+      }
 
       // 2. GET MENU
       if (action === 'menu') {
@@ -125,70 +117,37 @@ if (action === 'stores') {
         }
       }
 
-      // 4. GET HUB CONFIG - UPDATED WITH SLUG
-if (action === 'getHub') {
-  const townshipCode = queryStringParameters?.township;
-  if (!townshipCode) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ success: false, error: 'Missing township code' })
-    };
-  }
+      // 4. GET HUB CONFIG
+      if (action === 'getHub') {
+        const townshipCode = queryStringParameters?.township;
+        if (!townshipCode) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ success: false, error: 'Missing township code' })
+          };
+        }
 
-  const { data: hubs, error } = await supabase
-    .from('Hub_Configs')
-    .select('*')
-    .eq('Township_Code', townshipCode)
-    .limit(1);
-  
-  if (error) throw error;
-  
-  if (hubs && hubs.length > 0) {
-    // Log to verify slug is there
-    console.log('Hub fetched with slug:', hubs[0].slug);
-    
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, hub: hubs[0] })
-    };
-  } else {
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: false, error: 'Hub not found' })
-    };
-  }
-}
-
-      // 5. GET HUB BY SLUG - NEW FOR CLEAN URLS
-if (action === 'getHubBySlug') {
-  const slug = queryStringParameters?.slug;
-  if (!slug) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ success: false, error: 'Missing slug' })
-    };
-  }
-
-  const { data: hubs, error } = await supabase
-    .from('Hub_Configs')
-    .select('*')
-    .eq('slug', slug)
-    .limit(1);
-  
-  if (error) throw error;
-  
-  if (hubs && hubs.length > 0) {
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, hub: hubs[0] })
-    };
-  } else {
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: false, error: 'Hub not found' })
-    };
-  }
-}
+        const { data: hubs, error } = await supabase
+          .from('Hub_Configs')
+          .select('*')
+          .eq('Township_Code', townshipCode)
+          .limit(1);
+        
+        if (error) throw error;
+        
+        if (hubs && hubs.length > 0) {
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ success: true, hub: hubs[0] })
+          };
+        } else {
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ success: false, error: 'Hub not found' })
+          };
+        }
+      }
+    }
 
     // POST REQUESTS
     if (httpMethod === 'POST') {
