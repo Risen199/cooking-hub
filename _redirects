@@ -1,0 +1,26 @@
+# Hub redirects
+/blb          /hub.html?township=BLB    200
+/val          /hub.html?township=VAL    200
+/blouberg     /hub.html?township=BLB    200
+/bedworthpark /hub.html?township=BDP    200
+/mankweng     /hub.html?township=MAN    200
+
+# Store redirects
+/aunty-thandi /store-view.html?storeId=blb_01    200
+/bontles      /store-view.html?storeId=bdp_01    200
+
+# API routes - DON'T redirect these
+/api/*        /.netlify/functions/:splat          200
+
+# Don't redirect actual files
+/*.html       ! 
+/*.js         ! 
+/*.css        ! 
+/*.png        ! 
+/*.jpg        ! 
+/*.webp       ! 
+/*.svg        ! 
+/*.ico        ! 
+
+# Fallback - only for completely unknown paths
+/             /index.html                          200
