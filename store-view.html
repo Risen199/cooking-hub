@@ -339,30 +339,15 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    // ===========================================
-    // NEW: Clean URL support - extract storeId from path or query
-    // ===========================================
-    const path = window.location.pathname;
-    const pathParts = path.split('/').filter(part => part !== '');
-    const storeIdFromPath = pathParts[0]; // Gets "blb_01" from "/blb_01"
-
-    // Keep fallback to query parameters for backward compatibility
     const urlParams = new URLSearchParams(window.location.search);
-    const storeIdFromQuery = urlParams.get('storeId');
+    const storeId = urlParams.get('storeId');
     const from = urlParams.get('from');
     const township = urlParams.get('township');
-
-    // Use path-based ID first, fall back to query parameter
-    const storeId = storeIdFromPath || storeIdFromQuery;
-
     const backButton = document.getElementById('back-btn');
 
-    // Update back button logic: if 'from' is hub and township exists, use hub URL with township code
-    // Otherwise, default to index.html. This preserves old behavior when accessed via query params.
     if (from === 'hub' && township) {
       backButton.href = `hub.html?township=${township}`;
     } else {
-      // If accessed via clean URL, back button defaults to home
       backButton.href = 'index.html';
     }
 
@@ -670,4 +655,4 @@
   });
 </script>
 </body>
-</html>
+</html> 
