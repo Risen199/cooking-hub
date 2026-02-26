@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Township 5 — BEIJU</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css  " rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
     :root {
       --brand-red: #ff0000;
@@ -151,7 +151,7 @@
         <div class="col-md-6">
           <div class="p-4 rounded-4" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
             <p class="mb-1 small text-uppercase tracking-widest opacity-50">Developed & Managed By</p>
-            <a href="https://barwanadigitals.co.za  " target="_blank" class="text-decoration-none">
+            <a href="https://barwanadigitals.co.za" target="_blank" class="text-decoration-none">
               <h2 class="fw-900 text-white mb-0" style="letter-spacing: 2px;">BARWANA <span class="brand-red">DIGITALS</span></h2>
             </a>
           </div>
@@ -162,77 +162,72 @@
     </div>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js  "></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     const API_URL = '/.netlify/functions/handle-order';
 
-    // NEW CODE - Add this at the top after DOMContentLoaded
-// Get slug from URL path (e.g., "blouberg" from beiju.co.za/blouberg)
-let path = window.location.pathname;
-let slug = path.replace(/^\//, '').replace(/\/$/, '');
-
-console.log('🔍 Looking for hub with slug:', slug);
-
-try {
-    // Find hub by slug
-    const { data: hub, error } = await supabase
-        .from('Hub_Configs')
-        .select('*')
-        .eq('slug', slug)
-        .single();
-
-    if (error || !hub) {
-        document.getElementById('hub-name').textContent = 'Hub not found';
-        return;
-    }
-
-    console.log('✅ Found hub:', hub.Hub_Name);
+    // Get township code from URL (old way) OR clean slug from path (new way)
+    const urlParams = new URLSearchParams(window.location.search);
+    let townshipCode = urlParams.get('township');
     
-    // Now find all stores in this township
-    const { data: stores } = await supabase
-        .from('Stores')
-        .select('*')
-        .eq('Township_Code', hub.Township_Code);  // Use hub's township code
+    // Get clean slug from URL path (e.g., /blouberg)
+    let path = window.location.pathname;
+    let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
+    
+    console.log('🔍 Hub page loaded - township param:', townshipCode, 'clean slug:', cleanSlug);
 
-    // ... rest of your code to display stores stays the same
-
-} catch (error) {
-    console.error('Error:', error);
-}
-
-    // Load hub configuration from Airtable
+    // Load hub configuration from Supabase
     async function loadHubConfig() {
-      if (!townshipCode) {
-        alert('Invalid township. Redirecting to home...');
+      let hubData = null;
+      
+      // Try clean slug first (new way)
+      if (cleanSlug && cleanSlug !== 'hub.html' && cleanSlug !== '') {
+        try {
+          console.log('🔍 Trying to find hub by slug:', cleanSlug);
+          const response = await fetch(`${API_URL}?action=getHubBySlug&slug=${cleanSlug}`);
+          const data = await response.json();
+          
+          if (data.success && data.hub) {
+            hubData = data.hub;
+            console.log('✅ Found hub by slug:', hubData);
+            // Set townshipCode for backward compatibility
+            townshipCode = hubData.Township_Code;
+          }
+        } catch (error) {
+          console.log('No hub found by slug, falling back to township param');
+        }
+      }
+      
+      // Fall back to township param (old way)
+      if (!hubData && townshipCode) {
+        try {
+          console.log('🔍 Trying to find hub by township code:', townshipCode);
+          const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
+          const data = await response.json();
+          
+          if (data.success && data.hub) {
+            hubData = data.hub;
+            console.log('✅ Found hub by township code:', hubData);
+          }
+        } catch (error) {
+          console.error('Error loading hub by township:', error);
+        }
+      }
+
+      if (!hubData) {
+        alert('Township not found. Redirecting to home...');
         window.location.href = 'index.html';
         return null;
       }
 
-      try {
-        const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
-        const data = await response.json();
-        
-        if (data.success && data.hub) {
-          console.log('✅ Loaded hub config from Airtable:', data.hub);
-          return {
-            name: data.hub.Hub_Name || data.hub.name,
-            hero: data.hub.Hero_Image_URL || data.hub.hero,
-            slogan: data.hub.Slogan || 'Local Township Flavours',
-            color: data.hub.Brand_Color || '#ff0000',
-            storeCountText: data.hub.StoreCountText || 'Local Kitchens'
-          };
-        } else {
-          console.warn('Hub not found for township:', townshipCode);
-          alert(`Township "${townshipCode}" not found. Redirecting to home...`);
-          window.location.href = 'index.html';
-          return null;
-        }
-      } catch (error) {
-        console.error('❌ Error loading hub:', error);
-        alert('Error loading township. Returning to home...');
-        window.location.href = 'index.html';
-        return null;
-      }
+      return {
+        name: hubData.Hub_Name || hubData.name,
+        hero: hubData.Hero_Image_URL || hubData.hero,
+        slogan: hubData.Slogan || 'Local Township Flavours',
+        color: hubData.Brand_Color || '#ff0000',
+        storeCountText: hubData.StoreCountText || 'Local Kitchens',
+        townshipCode: hubData.Township_Code
+      };
     }
 
     // Main initialization
@@ -248,20 +243,22 @@ try {
       document.documentElement.style.setProperty('--brand-red', config.color);
       
       const heroSection = document.getElementById('hero-section');
-      heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${config.hero}')`;
+      if (config.hero) {
+        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${config.hero}')`;
+      }
       
       // Update hero text
       const heroTitle = document.querySelector('.hero-home .display-2');
       heroTitle.innerHTML = `${config.slogan} <span class="brand-red">${config.name}</span>`;
 
-      // Now load stores
+      // Now load stores using townshipCode from config
       await loadStores(config);
     }
 
     // Fetch and display stores
     async function loadStores(config) {
       try {
-        const response = await fetch(`${API_URL}?action=stores&township=${townshipCode}`);
+        const response = await fetch(`${API_URL}?action=stores&township=${config.townshipCode}`);
         const data = await response.json();
 
         if (!data.success || !data.stores || data.stores.length === 0) {
@@ -288,8 +285,12 @@ try {
             statusBadge = `<span class="badge bg-warning position-absolute" style="top:10px; left:10px;">Temporarily Closed</span>`;
           }
           
-          // FIXED: Using correct Hero_URL property from your data
           const storeImage = store.Hero_URL || store.Banner_URL || 'assets/images/image.webp';
+          
+          // Use slug for clean URL if available, otherwise fall back to Store_ID
+          const storeLink = store.slug ? 
+            `/${store.slug}` : 
+            `store-view.html?storeId=${store.Store_ID}&from=hub&township=${config.townshipCode}`;
           
           return `
           <div class="col-6 col-lg-3">
@@ -299,11 +300,12 @@ try {
               <img src="${storeImage}" 
                    class="card-img-top" 
                    style="height:160px; object-fit:cover;"
-                   alt="${store.Name}">
+                   alt="${store.Name}"
+                   onerror="this.src='assets/images/image.webp'">
               <div class="card-body p-3">
                 <h5 class="fw-bold mb-1">${store.Name}</h5>
                 <p class="small text-muted mb-3">${store.Slogan || 'Local Kitchen'}</p>
-                <a href="store-view.html?storeId=${store.Store_ID}&from=hub&township=${townshipCode}" 
+                <a href="${storeLink}" 
                    class="btn btn-dark w-100 rounded-pill">View Menu</a>
               </div>
             </div>
