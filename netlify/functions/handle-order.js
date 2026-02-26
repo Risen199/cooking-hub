@@ -148,7 +148,7 @@ exports.handler = async (event) => {
         }
       }
 
-      // 5. GET HUB BY SLUG - FIXED WITH DOUBLE QUOTES
+     // 5. GET HUB BY SLUG - WORKING VERSION
 if (action === 'getHubBySlug') {
   const slug = queryStringParameters?.slug;
   
@@ -162,16 +162,19 @@ if (action === 'getHubBySlug') {
   try {
     console.log('🔍 API: Looking for hub with slug:', slug);
     
-    // IMPORTANT: Use double quotes around the column name
+    // Use regular quotes - Supabase JS client handles case sensitivity
     const { data: hubs, error } = await supabase
       .from('Hub_Configs')
       .select('*')
-      .eq('"slug"', slug)  // Notice the double quotes!
+      .eq('slug', slug)
       .limit(1);
     
     if (error) {
       console.error('❌ API: Database error:', error);
-      throw error;
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ success: false, error: error.message })
+      };
     }
     
     if (hubs && hubs.length > 0) {
