@@ -149,6 +149,38 @@ exports.handler = async (event) => {
       }
     }
 
+    // 5. GET HUB BY SLUG - ADD THIS
+if (action === 'getHubBySlug') {
+  const slug = queryStringParameters?.slug;
+  if (!slug) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ success: false, error: 'Missing slug' })
+    };
+  }
+
+  const { data: hubs, error } = await supabase
+    .from('Hub_Configs')
+    .select('*')
+    .eq('slug', slug)
+    .limit(1);
+  
+  if (error) throw error;
+  
+  if (hubs && hubs.length > 0) {
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ success: true, hub: hubs[0] })
+    };
+  } else {
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ success: false, error: 'Hub not found' })
+    };
+  }
+}
+
+
     // POST REQUESTS
     if (httpMethod === 'POST') {
       const data = JSON.parse(body);
