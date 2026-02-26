@@ -339,10 +339,21 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    const urlParams = new URLSearchParams(window.location.search);
-    const storeId = urlParams.get('storeId');
-    const from = urlParams.get('from');
-    const township = urlParams.get('township');
+    const urlParams = new URLSearchParams(window.location.search)// ===========================================
+// NEW: Clean URL support - extract storeId from path or query
+// ===========================================
+const path = window.location.pathname;
+const pathParts = path.split('/').filter(part => part !== '');
+const storeIdFromPath = pathParts[0]; // Gets "blb_01" from "/blb_01"
+
+// Keep fallback to query parameters for backward compatibility
+const urlParams = new URLSearchParams(window.location.search);
+const storeIdFromQuery = urlParams.get('storeId');
+const from = urlParams.get('from');
+const township = urlParams.get('township');
+
+// Use path-based ID first, fall back to query parameter
+const storeId = storeIdFromPath || storeIdFromQuery;
     const backButton = document.getElementById('back-btn');
 
     if (from === 'hub' && township) {
