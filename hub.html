@@ -166,9 +166,39 @@
   <script>
     const API_URL = '/.netlify/functions/handle-order';
 
-    // Get township code from URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const townshipCode = urlParams.get('township');
+    // NEW CODE - Add this at the top after DOMContentLoaded
+// Get slug from URL path (e.g., "blouberg" from beiju.co.za/blouberg)
+let path = window.location.pathname;
+let slug = path.replace(/^\//, '').replace(/\/$/, '');
+
+console.log('🔍 Looking for hub with slug:', slug);
+
+try {
+    // Find hub by slug
+    const { data: hub, error } = await supabase
+        .from('Hub_Configs')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+
+    if (error || !hub) {
+        document.getElementById('hub-name').textContent = 'Hub not found';
+        return;
+    }
+
+    console.log('✅ Found hub:', hub.Hub_Name);
+    
+    // Now find all stores in this township
+    const { data: stores } = await supabase
+        .from('Stores')
+        .select('*')
+        .eq('Township_Code', hub.Township_Code);  // Use hub's township code
+
+    // ... rest of your code to display stores stays the same
+
+} catch (error) {
+    console.error('Error:', error);
+}
 
     // Load hub configuration from Airtable
     async function loadHubConfig() {
