@@ -612,7 +612,7 @@
                 }
 
                 const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
-                const total = cart.reduce((sum, i => sum + (i.price * i.qty), 0);
+                const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
 
                 fetch(API_URL, {
                   method: 'POST',
