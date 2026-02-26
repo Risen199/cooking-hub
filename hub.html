@@ -176,47 +176,87 @@
     
     console.log('🔍 Hub page - township param:', townshipCode, 'slug:', slug);
 
-    // Load hub configuration from Supabase
+    // Load all hubs first (like we load all stores in store-view.html)
+    async function loadAllHubs() {
+      try {
+        // We need to get all hubs - since there's no "get all hubs" endpoint,
+        // we'll use the stores endpoint and extract unique township codes
+        const response = await fetch(`${API_URL}?action=stores`);
+        const data = await response.json();
+        
+        if (!data.success || !data.stores) {
+          throw new Error('Failed to load stores');
+        }
+        
+        // Extract unique township codes from stores
+        const uniqueTownshipCodes = [...new Set(data.stores.map(s => s.Township_Code))];
+        console.log('📊 Found townships:', uniqueTownshipCodes);
+        
+        // For each township code, fetch its hub config
+        const hubs = [];
+        for (const code of uniqueTownshipCodes) {
+          try {
+            const hubRes = await fetch(`${API_URL}?action=getHub&township=${code}`);
+            const hubData = await hubRes.json();
+            if (hubData.success && hubData.hub) {
+              hubs.push(hubData.hub);
+            }
+          } catch (e) {
+            console.log('No hub for township:', code);
+          }
+        }
+        
+        console.log('📊 Loaded hubs:', hubs.length);
+        return hubs;
+      } catch (error) {
+        console.error('Error loading hubs:', error);
+        return [];
+      }
+    }
+
+    // Load hub configuration
     async function loadHubConfig() {
       let hubData = null;
       
-      // If we have a slug from redirect or path, use it
-      const slugToUse = slug && slug !== 'hub.html' && slug !== '' ? slug : townshipCode;
-      
-      if (!slugToUse) {
-        console.error('No identifier found');
-        alert('Township not found. Redirecting to home...');
-        window.location.href = 'index.html';
-        return null;
+      // If we have a slug from URL, try to find hub by slug first
+      if (slug && slug !== 'hub.html' && slug !== '') {
+        console.log('🔍 Looking for hub with slug:', slug);
+        
+        // Load all hubs and find by slug (like we do for stores)
+        const allHubs = await loadAllHubs();
+        hubData = allHubs.find(h => h.slug === slug);
+        
+        if (hubData) {
+          console.log('✅ Found hub by slug:', hubData.Hub_Name);
+          townshipCode = hubData.Township_Code;
+        }
       }
       
-      try {
-        // Try to find hub by slug first
-        console.log('🔍 Trying to find hub by slug:', slugToUse);
-        const response = await fetch(`${API_URL}?action=getHubBySlug&slug=${slugToUse}`);
-        const data = await response.json();
-        
-        if (data.success && data.hub) {
-          hubData = data.hub;
-          console.log('✅ Found hub by slug:', hubData);
-        } else {
-          // If not found by slug, try township code
-          console.log('🔍 Trying to find hub by township code:', slugToUse);
-          const townshipResponse = await fetch(`${API_URL}?action=getHub&township=${slugToUse}`);
-          const townshipData = await townshipResponse.json();
+      // If not found by slug and we have townshipCode, try that
+      if (!hubData && townshipCode) {
+        console.log('🔍 Trying to find hub by township code:', townshipCode);
+        try {
+          const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
+          const data = await response.json();
           
-          if (townshipData.success && townshipData.hub) {
-            hubData = townshipData.hub;
-            console.log('✅ Found hub by township code:', hubData);
+          if (data.success && data.hub) {
+            hubData = data.hub;
+            console.log('✅ Found hub by township code:', hubData.Hub_Name);
           }
+        } catch (error) {
+          console.error('Error loading hub by township:', error);
         }
-      } catch (error) {
-        console.error('Error loading hub:', error);
       }
 
       if (!hubData) {
-        alert('Township not found. Redirecting to home...');
-        window.location.href = 'index.html';
+        console.error('No hub found');
+        document.getElementById('township-name').textContent = 'Township not found';
+        document.getElementById('stores-container').innerHTML = `
+          <div class="col-12 text-center py-5">
+            <h3 class="text-muted">Township not found</h3>
+            <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
+          </div>
+        `;
         return null;
       }
 
