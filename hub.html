@@ -166,52 +166,52 @@
   <script>
     const API_URL = '/.netlify/functions/handle-order';
 
-    // Get township code from URL (old way) OR clean slug from path (new way)
+    // Get parameters from URL
     const urlParams = new URLSearchParams(window.location.search);
     let townshipCode = urlParams.get('township');
     
-    // Get clean slug from URL path (e.g., /blouberg)
+    // Get slug from URL path (e.g., /blouberg)
     let path = window.location.pathname;
-    let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
+    let slug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    console.log('🔍 Hub page loaded - township param:', townshipCode, 'clean slug:', cleanSlug);
+    console.log('🔍 Hub page - township param:', townshipCode, 'slug:', slug);
 
     // Load hub configuration from Supabase
     async function loadHubConfig() {
       let hubData = null;
       
-      // Try clean slug first (new way)
-      if (cleanSlug && cleanSlug !== 'hub.html' && cleanSlug !== '') {
-        try {
-          console.log('🔍 Trying to find hub by slug:', cleanSlug);
-          const response = await fetch(`${API_URL}?action=getHubBySlug&slug=${cleanSlug}`);
-          const data = await response.json();
-          
-          if (data.success && data.hub) {
-            hubData = data.hub;
-            console.log('✅ Found hub by slug:', hubData);
-            // Set townshipCode for backward compatibility
-            townshipCode = hubData.Township_Code;
-          }
-        } catch (error) {
-          console.log('No hub found by slug, falling back to township param');
-        }
+      // If we have a slug from redirect or path, use it
+      const slugToUse = slug && slug !== 'hub.html' && slug !== '' ? slug : townshipCode;
+      
+      if (!slugToUse) {
+        console.error('No identifier found');
+        alert('Township not found. Redirecting to home...');
+        window.location.href = 'index.html';
+        return null;
       }
       
-      // Fall back to township param (old way)
-      if (!hubData && townshipCode) {
-        try {
-          console.log('🔍 Trying to find hub by township code:', townshipCode);
-          const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
-          const data = await response.json();
+      try {
+        // Try to find hub by slug first
+        console.log('🔍 Trying to find hub by slug:', slugToUse);
+        const response = await fetch(`${API_URL}?action=getHubBySlug&slug=${slugToUse}`);
+        const data = await response.json();
+        
+        if (data.success && data.hub) {
+          hubData = data.hub;
+          console.log('✅ Found hub by slug:', hubData);
+        } else {
+          // If not found by slug, try township code
+          console.log('🔍 Trying to find hub by township code:', slugToUse);
+          const townshipResponse = await fetch(`${API_URL}?action=getHub&township=${slugToUse}`);
+          const townshipData = await townshipResponse.json();
           
-          if (data.success && data.hub) {
-            hubData = data.hub;
+          if (townshipData.success && townshipData.hub) {
+            hubData = townshipData.hub;
             console.log('✅ Found hub by township code:', hubData);
           }
-        } catch (error) {
-          console.error('Error loading hub by township:', error);
         }
+      } catch (error) {
+        console.error('Error loading hub:', error);
       }
 
       if (!hubData) {
