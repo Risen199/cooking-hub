@@ -1,9 +1,11 @@
 # Hub redirects
-/blb          /hub.html?township=BLB    200
 /val          /hub.html?township=VAL    200
 /blouberg     /hub.html?township=BLB    200
 /bedworthpark /hub.html?township=BDP    200
 /mankweng     /hub.html?township=MAN    200
+/seshego     /hub.html?township=SES    200
+/Vanderbijlpark     /hub.html?township=VDK    200
+ 
 
 # Store redirects
 /aunty-thandi /store-view.html?storeId=blb_01    200

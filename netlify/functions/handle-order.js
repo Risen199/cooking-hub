@@ -147,55 +147,54 @@ exports.handler = async (event) => {
           };
         }
       }
-    }
 
-      // 5. GET HUB BY SLUG
-if (action === 'getHubBySlug') {
-  const slug = queryStringParameters?.slug;
-  
-  if (!slug) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ success: false, error: 'Missing slug' })
-    };
-  }
+      // 5. GET HUB BY SLUG - FIXED VERSION
+      if (action === 'getHubBySlug') {
+        const slug = queryStringParameters?.slug;
+        
+        if (!slug) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ success: false, error: 'Missing slug' })
+          };
+        }
 
-  try {
-    console.log('🔍 Looking for hub with slug:', slug);
-    
-    const { data: hubs, error } = await supabase
-      .from('Hub_Configs')
-      .select('*')
-      .eq('slug', slug)  // Using the exact column name you confirmed
-      .limit(1);
-    
-    if (error) {
-      console.error('❌ Database error:', error);
-      throw error;
+        try {
+          console.log('🔍 API: Looking for hub with slug:', slug);
+          
+          const { data: hubs, error } = await supabase
+            .from('Hub_Configs')
+            .select('*')
+            .eq('slug', slug)
+            .limit(1);
+          
+          if (error) {
+            console.error('❌ API: Database error:', error);
+            throw error;
+          }
+          
+          if (hubs && hubs.length > 0) {
+            console.log('✅ API: Found hub:', hubs[0].Hub_Name);
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ success: true, hub: hubs[0] })
+            };
+          } else {
+            console.log('❌ API: No hub found with slug:', slug);
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ success: false, error: 'Hub not found' })
+            };
+          }
+        } catch (err) {
+          console.error('❌ API: Function error:', err);
+          return {
+            statusCode: 500,
+            body: JSON.stringify({ success: false, error: err.message })
+          };
+        }
+      }
     }
-    
-    if (hubs && hubs.length > 0) {
-      console.log('✅ Found hub:', hubs[0].Hub_Name);
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ success: true, hub: hubs[0] })
-      };
-    } else {
-      console.log('❌ No hub found with slug:', slug);
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ success: false, error: 'Hub not found' })
-      };
-    }
-  } catch (err) {
-    console.error('❌ Function error:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ success: false, error: err.message })
-    };
-  }
-}
-
 
     // POST REQUESTS
     if (httpMethod === 'POST') {
@@ -205,7 +204,6 @@ if (action === 'getHubBySlug') {
       if (data.action === 'logHeatmap') {
         const searchTerm = data.Search_Term || '';
         
-        // FIXED: Using correct column names and SA timestamp
         const { error } = await supabase
           .from('Heatmap')
           .insert([{ 
@@ -215,7 +213,6 @@ if (action === 'getHubBySlug') {
         
         if (error) {
           console.error('Heatmap insert error:', error);
-          // Don't throw - we still want to return success to user
         }
         
         return { 
@@ -225,39 +222,36 @@ if (action === 'getHubBySlug') {
       }
 
       // CREATE ORDER     
-    if (data.action === 'order') {
-      const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
-      const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
-      const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
+      if (data.action === 'order') {
+        const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
+        const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
+        const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
-  // ✅ CALCULATE COMMISSIONS
-  const totalAmount = Number(data.Total_Amount) || 0;
-  const commissionPool = Number((totalAmount * 0.15).toFixed(2));
-  const promoterCommission = Number((commissionPool * 0.3).toFixed(2));
-  const companyCommission = Number((commissionPool * 0.7).toFixed(2));
+        const totalAmount = Number(data.Total_Amount) || 0;
+        const commissionPool = Number((totalAmount * 0.15).toFixed(2));
+        const promoterCommission = Number((commissionPool * 0.3).toFixed(2));
+        const companyCommission = Number((commissionPool * 0.7).toFixed(2));
 
-  // Log to Messages table with calculated commissions
-  const { error } = await supabase
-    .from('Messages')
-    .insert([{
-      Message_ID: 'msg_' + Date.now(),
-      Store_ID: data.Store_ID || 'unknown',
-      Customer_Name: data.Customer_Name || 'Customer',
-      Order_Items: data.Order_Items || 'No items',
-      Total_Amount: totalAmount,
-      Commission_Pool: commissionPool,
-      Promoter_Commission: promoterCommission,
-      Company_Commission: companyCommission,
-      Pickup_Window: data.Pickup_Window || 'ASAP',
-      Delivery_Type: data.Delivery_Type || 'Collection',
-      Status: 'Ordered',
-      Timestamp: getSATimestamp(),
-      Source: 'Website'
-    }]);
+        const { error } = await supabase
+          .from('Messages')
+          .insert([{
+            Message_ID: 'msg_' + Date.now(),
+            Store_ID: data.Store_ID || 'unknown',
+            Customer_Name: data.Customer_Name || 'Customer',
+            Order_Items: data.Order_Items || 'No items',
+            Total_Amount: totalAmount,
+            Commission_Pool: commissionPool,
+            Promoter_Commission: promoterCommission,
+            Company_Commission: companyCommission,
+            Pickup_Window: data.Pickup_Window || 'ASAP',
+            Delivery_Type: data.Delivery_Type || 'Collection',
+            Status: 'Ordered',
+            Timestamp: getSATimestamp(),
+            Source: 'Website'
+          }]);
 
         if (error) {
           console.error('Messages insert error:', error);
-          // WhatsApp still works even if logging fails
         }
 
         return { 
