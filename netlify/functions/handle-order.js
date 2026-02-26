@@ -149,9 +149,10 @@ exports.handler = async (event) => {
       }
     }
 
-    // 5. GET HUB BY SLUG - ADD THIS
+      // 5. GET HUB BY SLUG
 if (action === 'getHubBySlug') {
   const slug = queryStringParameters?.slug;
+  
   if (!slug) {
     return {
       statusCode: 400,
@@ -159,23 +160,38 @@ if (action === 'getHubBySlug') {
     };
   }
 
-  const { data: hubs, error } = await supabase
-    .from('Hub_Configs')
-    .select('*')
-    .eq('slug', slug)
-    .limit(1);
-  
-  if (error) throw error;
-  
-  if (hubs && hubs.length > 0) {
+  try {
+    console.log('🔍 Looking for hub with slug:', slug);
+    
+    const { data: hubs, error } = await supabase
+      .from('Hub_Configs')
+      .select('*')
+      .eq('slug', slug)  // Using the exact column name you confirmed
+      .limit(1);
+    
+    if (error) {
+      console.error('❌ Database error:', error);
+      throw error;
+    }
+    
+    if (hubs && hubs.length > 0) {
+      console.log('✅ Found hub:', hubs[0].Hub_Name);
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ success: true, hub: hubs[0] })
+      };
+    } else {
+      console.log('❌ No hub found with slug:', slug);
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ success: false, error: 'Hub not found' })
+      };
+    }
+  } catch (err) {
+    console.error('❌ Function error:', err);
     return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, hub: hubs[0] })
-    };
-  } else {
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: false, error: 'Hub not found' })
+      statusCode: 500,
+      body: JSON.stringify({ success: false, error: err.message })
     };
   }
 }
