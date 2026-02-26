@@ -339,10 +339,37 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    const urlParams = new URLSearchParams(window.location.search);
-    const storeId = urlParams.get('storeId');
-    const from = urlParams.get('from');
-    const township = urlParams.get('township');
+    // NEW CODE - Add this at the top after DOMContentLoaded
+// Get slug from URL path (e.g., "aunty-thandi" from beiju.co.za/aunty-thandi)
+let path = window.location.pathname;
+let slug = path.replace(/^\//, '').replace(/\/$/, '');
+
+console.log('🔍 Looking for store with slug:', slug);
+
+try {
+    // Find store by slug
+    const { data: store, error } = await supabase
+        .from('Stores')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+
+    if (error || !store) {
+        document.getElementById('store-name').textContent = 'Store not found';
+        return;
+    }
+
+    console.log('✅ Found store:', store.Name);
+    
+    // Set back button using store's township
+    const backButton = document.getElementById('back-btn');
+    backButton.href = `/${store.Township_Code.toLowerCase()}`;  // Link to hub page
+
+    // ... rest of your code to display menu stays the same
+
+} catch (error) {
+    console.error('Error:', error);
+}
     const backButton = document.getElementById('back-btn');
 
     if (from === 'hub' && township) {
