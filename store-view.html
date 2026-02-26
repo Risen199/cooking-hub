@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Store — BEIJU</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css    " rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
     :root {
       --brand-red: #ff0000;
@@ -250,7 +250,7 @@
         <div class="col-md-6">
           <div class="p-4 rounded-4" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
             <p class="mb-1 small text-uppercase tracking-widest opacity-50">Developed & Managed By</p>
-            <a href="https://barwanadigitals.co.za    " target="_blank" class="text-decoration-none">
+            <a href="https://barwanadigitals.co.za" target="_blank" class="text-decoration-none">
               <h2 class="fw-900 text-white mb-0" style="letter-spacing: 2px;">BARWANA <span class="brand-red">DIGITALS</span></h2>
             </a>
           </div>
@@ -260,9 +260,9 @@
     </div>
   </footer>
 
-  <a href="https://wa.me/27726515909    " class="whatsapp-float" id="wa-float">💬</a>
+  <a href="https://wa.me/27726515909" class="whatsapp-float" id="wa-float">💬</a>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js    "></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   const API_URL = '/.netlify/functions/handle-order';
 
@@ -339,61 +339,49 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    // NEW CODE - Add this at the top after DOMContentLoaded
-// Get slug from URL path (e.g., "aunty-thandi" from beiju.co.za/aunty-thandi)
-let path = window.location.pathname;
-let slug = path.replace(/^\//, '').replace(/\/$/, '');
-
-console.log('🔍 Looking for store with slug:', slug);
-
-try {
-    // Find store by slug
-    const { data: store, error } = await supabase
-        .from('Stores')
-        .select('*')
-        .eq('slug', slug)
-        .single();
-
-    if (error || !store) {
-        document.getElementById('store-name').textContent = 'Store not found';
-        return;
-    }
-
-    console.log('✅ Found store:', store.Name);
+    // Get slug from URL path (e.g., "aunty-thandi" from beiju.co.za/aunty-thandi)
+    let path = window.location.pathname;
+    let slug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    // Set back button using store's township
-    const backButton = document.getElementById('back-btn');
-    backButton.href = `/${store.Township_Code.toLowerCase()}`;  // Link to hub page
-
-    // ... rest of your code to display menu stays the same
-
-} catch (error) {
-    console.error('Error:', error);
-}
-    const backButton = document.getElementById('back-btn');
-
-    if (from === 'hub' && township) {
-      backButton.href = `hub.html?township=${township}`;
-    } else {
-      backButton.href = 'index.html';
-    }
-
-    if (!storeId) {
-      document.getElementById('store-name').textContent = 'Store not found';
+    console.log('🔍 Looking for store with slug:', slug);
+    
+    // If no slug or it's store-view.html, redirect to home
+    if (!slug || slug === 'store-view.html') {
+      window.location.href = '/';
       return;
     }
-
+    
     try {
+      // Load all stores
       const storeRes = await fetch(`${API_URL}?action=stores`);
       const storeData = await storeRes.json();
       if (!storeData.success) throw new Error('Failed to load stores');
-
-      const store = storeData.stores.find(s => s.Store_ID === storeId);
+      
+      // Find store by slug
+      const store = storeData.stores.find(s => s.slug === slug);
+      
       if (!store) {
         document.getElementById('store-name').textContent = 'Store not found';
+        document.getElementById('menu-container').innerHTML = `
+          <div class="col-12 text-center py-5">
+            <p class="text-danger">Sorry, this store doesn't exist.</p>
+            <a href="/" class="btn btn-outline-primary mt-3">Back to Home</a>
+          </div>
+        `;
         return;
       }
-
+      
+      console.log('✅ Found store:', store.Name);
+      
+      // Set back button to hub page using hub slug
+      const backButton = document.getElementById('back-btn');
+      
+      // We need to find the hub slug for this store's township
+      // For now, use township code lowercase as fallback
+      const townshipCode = store.Township_Code?.toLowerCase() || '';
+      backButton.href = `/${townshipCode}`;
+      
+      // Check if store is temporarily closed
       if (store.Temporarily_Closed) {
         const heroContent = document.querySelector('.hero-content');
         heroContent.innerHTML += `
@@ -408,7 +396,7 @@ try {
       document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
       document.getElementById('store-slogan').textContent = store.Slogan || '';
       
-      // FIXED: Updated hero background with store's actual image
+      // Update hero background with store's actual image
       const heroSection = document.querySelector('.hero');
       if (store.Hero_URL) {
         heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${store.Hero_URL}')`;
@@ -427,7 +415,7 @@ try {
       }
 
       document.body.dataset.waNumber = store.WhatsApp || '27726515909';
-      document.getElementById('wa-float').href = `https://wa.me/    ${store.WhatsApp || '27726515909'}`;
+      document.getElementById('wa-float').href = `https://wa.me/${store.WhatsApp || '27726515909'}`;
       
       const primaryColor = store.Primary_Color || '#ff0000';
       document.documentElement.style.setProperty('--brand-red', primaryColor);
@@ -436,7 +424,8 @@ try {
       storeHours.closing = store.Closing_Time_Clean || "18:00";
       storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
 
-      const menuRes = await fetch(`${API_URL}?action=menu&storeId=${storeId}`);
+      // Load menu using store ID
+      const menuRes = await fetch(`${API_URL}?action=menu&storeId=${store.Store_ID}`);
       const menuData = await menuRes.json();
       if (!menuData.success) throw new Error('Failed to load menu');
 
@@ -447,7 +436,7 @@ try {
         return;
       }
 
-      // FIXED: Use actual Image_URL from menu data for menu items
+      // Build menu HTML with images
       let menuHtml = '';
       menuData.menu.forEach(item => {
         // Use the actual Image_URL from menu data, with fallback
@@ -471,6 +460,7 @@ try {
       });
       menuContainer.innerHTML = menuHtml;
 
+      // Initialize cart
       let cart = [];
       window.cart = cart;
 
@@ -520,6 +510,7 @@ try {
         }
       }
 
+      // View Details Modal
       document.querySelectorAll('.view-details').forEach(link => {
         link.addEventListener('click', function(e) {
           e.preventDefault();
@@ -631,7 +622,7 @@ try {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     action: 'order',
-                    Store_ID: storeId,
+                    Store_ID: store.Store_ID,
                     Customer_Name: name,
                     Order_Items: lines.join('|'),
                     Total_Amount: total,
@@ -651,14 +642,14 @@ try {
                     alert("Order logging failed. Opening WhatsApp anyway...");
                     const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                     const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
-                    window.open(`https://wa.me/    ${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                   }
                 })
                 .catch(err => {
                   console.warn("Logging failed:", err);
                   const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                   const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
-                  window.open(`https://wa.me/    ${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 });
 
                 document.body.removeChild(modal);
@@ -682,4 +673,4 @@ try {
   });
 </script>
 </body>
-</html> 
+</html>
