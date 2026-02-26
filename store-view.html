@@ -345,50 +345,86 @@
     
     console.log('🔍 Looking for store with slug:', slug);
     
-    // Replace that block with:
-console.log('Current slug:', slug);
-
-if (!slug) {
-  console.log('No slug found, staying on page but showing error');
-  document.getElementById('store-name').textContent = 'No store specified';
-  return;
-}
-
-if (slug === 'store-view.html') {
-  console.log('Direct access to store-view.html - show error');
-  document.getElementById('store-name').textContent = 'Please use a store link like /store-name';
-  return;
-}
+    // Handle direct access to store-view.html
+    if (slug === 'store-view.html' || slug === '') {
+      document.getElementById('store-name').textContent = 'Invalid store link';
+      document.getElementById('menu-container').innerHTML = `
+        <div class="col-12 text-center py-5">
+          <p class="text-danger">Please use a valid store link like /store-name</p>
+          <a href="/" class="btn btn-outline-primary mt-3">Back to Home</a>
+        </div>
+      `;
+      return;
+    }
+    
     try {
       // Load all stores
+      console.log('Fetching stores from API...');
       const storeRes = await fetch(`${API_URL}?action=stores`);
       const storeData = await storeRes.json();
-      if (!storeData.success) throw new Error('Failed to load stores');
+      
+      if (!storeData.success) {
+        console.error('Failed to load stores:', storeData);
+        throw new Error('Failed to load stores');
+      }
+      
+      console.log('Stores loaded:', storeData.stores?.length || 0, 'stores found');
       
       // Find store by slug
-      const store = storeData.stores.find(s => s.slug === slug);
+      const store = storeData.stores?.find(s => s.slug === slug);
       
       if (!store) {
+        console.log('Store not found for slug:', slug);
         document.getElementById('store-name').textContent = 'Store not found';
         document.getElementById('menu-container').innerHTML = `
           <div class="col-12 text-center py-5">
-            <p class="text-danger">Sorry, this store doesn't exist.</p>
+            <p class="text-danger">Sorry, we couldn't find a store with the name "${slug}"</p>
             <a href="/" class="btn btn-outline-primary mt-3">Back to Home</a>
           </div>
         `;
         return;
       }
       
-      console.log('✅ Found store:', store.Name);
+      console.log('✅ Found store:', store.Name, 'with ID:', store.Store_ID);
       
-      // Set back button to hub page using hub slug
+      // Set back button to hub page
       const backButton = document.getElementById('back-btn');
-      
-      // We need to find the hub slug for this store's township
-      // For now, use township code lowercase as fallback
       const townshipCode = store.Township_Code?.toLowerCase() || '';
       backButton.href = `/${townshipCode}`;
       
+      // Display store information
+      document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
+      document.getElementById('store-slogan').textContent = store.Slogan || '';
+      
+      // Update hero background with store's image
+      const heroSection = document.querySelector('.hero');
+      if (store.Hero_URL) {
+        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${store.Hero_URL}')`;
+      } else if (store.Banner_URL) {
+        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${store.Banner_URL}')`;
+      }
+      
+      // Display location info
+      if (store.Landmarks) {
+        document.getElementById('landmarks-text').innerHTML = `📍 ${store.Landmarks}`;
+      }
+      if (store.Area_Description) {
+        document.getElementById('description-text').textContent = store.Area_Description.replace(/"/g, '');
+      }
+
+      // Set WhatsApp number
+      document.body.dataset.waNumber = store.WhatsApp || '27726515909';
+      document.getElementById('wa-float').href = `https://wa.me/${store.WhatsApp || '27726515909'}`;
+      
+      // Set brand color
+      const primaryColor = store.Primary_Color || '#ff0000';
+      document.documentElement.style.setProperty('--brand-red', primaryColor);
+
+      // Set store hours
+      storeHours.opening = store.Opening_Time_Clean || "08:30";
+      storeHours.closing = store.Closing_Time_Clean || "18:00";
+      storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
+
       // Check if store is temporarily closed
       if (store.Temporarily_Closed) {
         const heroContent = document.querySelector('.hero-content');
@@ -401,41 +437,15 @@ if (slug === 'store-view.html') {
         `;
       }
 
-      document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
-      document.getElementById('store-slogan').textContent = store.Slogan || '';
-      
-      // Update hero background with store's actual image
-      const heroSection = document.querySelector('.hero');
-      if (store.Hero_URL) {
-        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${store.Hero_URL}')`;
-        heroSection.style.backgroundSize = 'cover';
-      } else if (store.Banner_URL) {
-        // Fallback to Banner_URL if Hero_URL doesn't exist
-        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${store.Banner_URL}')`;
-        heroSection.style.backgroundSize = 'cover';
-      }
-      
-      if (store.Landmarks) {
-        document.getElementById('landmarks-text').innerHTML = `📍 ${store.Landmarks}`;
-      }
-      if (store.Area_Description) {
-        document.getElementById('description-text').textContent = store.Area_Description.replace(/"/g, '');
-      }
-
-      document.body.dataset.waNumber = store.WhatsApp || '27726515909';
-      document.getElementById('wa-float').href = `https://wa.me/${store.WhatsApp || '27726515909'}`;
-      
-      const primaryColor = store.Primary_Color || '#ff0000';
-      document.documentElement.style.setProperty('--brand-red', primaryColor);
-
-      storeHours.opening = store.Opening_Time_Clean || "08:30";
-      storeHours.closing = store.Closing_Time_Clean || "18:00";
-      storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
-
       // Load menu using store ID
+      console.log('Fetching menu for store ID:', store.Store_ID);
       const menuRes = await fetch(`${API_URL}?action=menu&storeId=${store.Store_ID}`);
       const menuData = await menuRes.json();
-      if (!menuData.success) throw new Error('Failed to load menu');
+      
+      if (!menuData.success) {
+        console.error('Failed to load menu:', menuData);
+        throw new Error('Failed to load menu');
+      }
 
       const menuContainer = document.getElementById('menu-container');
 
@@ -444,10 +454,11 @@ if (slug === 'store-view.html') {
         return;
       }
 
-      // Build menu HTML with images
+      console.log('Menu loaded:', menuData.menu.length, 'items found');
+
+      // Build menu HTML
       let menuHtml = '';
       menuData.menu.forEach(item => {
-        // Use the actual Image_URL from menu data, with fallback
         const itemImage = item.Image_URL || 'assets/images/default-food.jpg';
         
         menuHtml += `
@@ -457,7 +468,8 @@ if (slug === 'store-view.html') {
                 data-name="${item.Item_Name}" 
                 data-price="${item.Price}"
                 data-description="${item.Description || 'Delicious meal'}">
-              <img src="${itemImage}" class="w-100 rounded mb-2" style="height:140px; object-fit:cover;">
+              <img src="${itemImage}" class="w-100 rounded mb-2" style="height:140px; object-fit:cover;" 
+                   onerror="this.src='assets/images/default-food.jpg'">
               <h6 class="fw-bold">${item.Item_Name}</h6>
               <p class="fw-bold fs-5" style="color: var(--brand-red);">R${item.Price}</p>
               <a href="#" class="view-details" data-id="${item.Item_ID}">ⓘ View Details</a>
@@ -564,7 +576,7 @@ if (slug === 'store-view.html') {
 
       document.getElementById('checkout-btn').addEventListener('click', function() {
         if (store.Temporarily_Closed) {
-          alert(`🚫 ${store.Name} is Temporarily Closed\n\n${store.Status_Message || 'Orders are not being accepted at this time. Please check back later or try another kitchen.'}`);
+          alert(`🚫 ${store.Name} is Temporarily Closed\n\n${store.Status_Message || 'Orders are not being accepted at this time.'}`);
           return;
         }
         
@@ -580,7 +592,7 @@ if (slug === 'store-view.html') {
         modal.innerHTML = `
           <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
             <h4 class="mb-3">Choose Pickup Time</h4>
-            <p class="time-note">Kitchens need time to prepare your order. Pickup slots start from the next available window.</p>
+            <p class="time-note">Kitchens need time to prepare your order.</p>
             <div id="time-slots" class="mt-3"></div>
             <button class="btn btn-secondary w-100 mt-3 py-2" id="close-pickup-modal">Cancel</button>
           </div>
@@ -605,16 +617,17 @@ if (slug === 'store-view.html') {
               modal.innerHTML = `
                 <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
                   <h4 class="mb-3">What's your name Chomie!!</h4>
-                  <p class="text-muted mb-3">We'll put this on your order (e.g., "Blessing")</p>
                   <input type="text" id="customer-name" class="form-control mb-3" placeholder="First name only" maxlength="20">
                   <button class="btn btn-success w-100 mb-2 py-3" id="confirm-name">Confirm & Send Order</button>
                   <button class="btn btn-secondary w-100 py-2" id="back-to-time">← Back to Time</button>
                 </div>
               `;
+              
               document.getElementById('back-to-time').addEventListener('click', () => {
                 document.body.removeChild(modal);
                 document.getElementById('checkout-btn').click();
               });
+              
               document.getElementById('confirm-name').addEventListener('click', () => {
                 const name = document.getElementById('customer-name').value.trim();
                 if (!name) {
@@ -644,10 +657,8 @@ if (slug === 'store-view.html') {
                   if (data.success && data.whatsAppUrl) {
                     window.open(data.whatsAppUrl, '_blank');
                     cart = [];
-                    window.cart = cart;
                     updateCartUI();
                   } else {
-                    alert("Order logging failed. Opening WhatsApp anyway...");
                     const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                     const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -676,7 +687,7 @@ if (slug === 'store-view.html') {
     } catch (error) {
       console.error('Error loading store:', error);
       document.getElementById('store-name').textContent = 'Error loading store';
-      document.getElementById('menu-container').innerHTML = `<div class="col-12 text-center py-5"><p class="text-danger">Failed to load menu.</p></div>`;
+      document.getElementById('menu-container').innerHTML = `<div class="col-12 text-center py-5"><p class="text-danger">Failed to load menu. Please try again later.</p></div>`;
     }
   });
 </script>
