@@ -345,12 +345,20 @@
     
     console.log('🔍 Looking for store with slug:', slug);
     
-    // If no slug or it's store-view.html, redirect to home
-    if (!slug || slug === 'store-view.html') {
-      window.location.href = '/';
-      return;
-    }
-    
+    // Replace that block with:
+console.log('Current slug:', slug);
+
+if (!slug) {
+  console.log('No slug found, staying on page but showing error');
+  document.getElementById('store-name').textContent = 'No store specified';
+  return;
+}
+
+if (slug === 'store-view.html') {
+  console.log('Direct access to store-view.html - show error');
+  document.getElementById('store-name').textContent = 'Please use a store link like /store-name';
+  return;
+}
     try {
       // Load all stores
       const storeRes = await fetch(`${API_URL}?action=stores`);
