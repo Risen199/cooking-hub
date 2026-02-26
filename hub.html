@@ -176,59 +176,42 @@
     
     console.log('🔍 Hub page - township param:', townshipCode, 'slug:', slug);
 
-    // Load all hubs first (like we load all stores in store-view.html)
-    async function loadAllHubs() {
-      try {
-        // We need to get all hubs - since there's no "get all hubs" endpoint,
-        // we'll use the stores endpoint and extract unique township codes
-        const response = await fetch(`${API_URL}?action=stores`);
-        const data = await response.json();
-        
-        if (!data.success || !data.stores) {
-          throw new Error('Failed to load stores');
-        }
-        
-        // Extract unique township codes from stores
-        const uniqueTownshipCodes = [...new Set(data.stores.map(s => s.Township_Code))];
-        console.log('📊 Found townships:', uniqueTownshipCodes);
-        
-        // For each township code, fetch its hub config
-        const hubs = [];
-        for (const code of uniqueTownshipCodes) {
-          try {
-            const hubRes = await fetch(`${API_URL}?action=getHub&township=${code}`);
-            const hubData = await hubRes.json();
-            if (hubData.success && hubData.hub) {
-              hubs.push(hubData.hub);
-            }
-          } catch (e) {
-            console.log('No hub for township:', code);
-          }
-        }
-        
-        console.log('📊 Loaded hubs:', hubs.length);
-        return hubs;
-      } catch (error) {
-        console.error('Error loading hubs:', error);
-        return [];
-      }
-    }
-
-    // Load hub configuration
+    // Load hub configuration by slug (like store-view.html does)
     async function loadHubConfig() {
       let hubData = null;
       
-      // If we have a slug from URL, try to find hub by slug first
+      // Try to find by slug first (clean URL)
       if (slug && slug !== 'hub.html' && slug !== '') {
-        console.log('🔍 Looking for hub with slug:', slug);
+        console.log('🔍 Trying to find hub by slug:', slug);
         
-        // Load all hubs and find by slug (like we do for stores)
-        const allHubs = await loadAllHubs();
-        hubData = allHubs.find(h => h.slug === slug);
-        
-        if (hubData) {
-          console.log('✅ Found hub by slug:', hubData.Hub_Name);
-          townshipCode = hubData.Township_Code;
+        try {
+          // First, get all stores to find township codes
+          const storesRes = await fetch(`${API_URL}?action=stores`);
+          const storesData = await storesRes.json();
+          
+          if (storesData.success && storesData.stores) {
+            // Get unique township codes
+            const townshipCodes = [...new Set(storesData.stores.map(s => s.Township_Code))];
+            
+            // For each township, get hub and check if slug matches
+            for (const code of townshipCodes) {
+              try {
+                const hubRes = await fetch(`${API_URL}?action=getHub&township=${code}`);
+                const hubData_temp = await hubRes.json();
+                
+                if (hubData_temp.success && hubData_temp.hub && hubData_temp.hub.slug === slug) {
+                  hubData = hubData_temp.hub;
+                  console.log('✅ Found hub by slug:', hubData.Hub_Name);
+                  townshipCode = code;
+                  break;
+                }
+              } catch (e) {
+                // Skip if hub not found
+              }
+            }
+          }
+        } catch (error) {
+          console.log('Error finding hub by slug:', error);
         }
       }
       
