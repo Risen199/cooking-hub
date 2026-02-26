@@ -147,57 +147,7 @@ exports.handler = async (event) => {
           };
         }
       }
-
-     // 5. GET HUB BY SLUG - WORKING VERSION
-if (action === 'getHubBySlug') {
-  const slug = queryStringParameters?.slug;
-  
-  if (!slug) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ success: false, error: 'Missing slug' })
-    };
-  }
-
-  try {
-    console.log('🔍 API: Looking for hub with slug:', slug);
-    
-    // Use regular quotes - Supabase JS client handles case sensitivity
-    const { data: hubs, error } = await supabase
-      .from('Hub_Configs')
-      .select('*')
-      .eq('slug', slug)
-      .limit(1);
-    
-    if (error) {
-      console.error('❌ API: Database error:', error);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ success: false, error: error.message })
-      };
     }
-    
-    if (hubs && hubs.length > 0) {
-      console.log('✅ API: Found hub:', hubs[0].Hub_Name);
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ success: true, hub: hubs[0] })
-      };
-    } else {
-      console.log('❌ API: No hub found with slug:', slug);
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ success: false, error: 'Hub not found' })
-      };
-    }
-  } catch (err) {
-    console.error('❌ API: Function error:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ success: false, error: err.message })
-    };
-  }
-}
 
     // POST REQUESTS
     if (httpMethod === 'POST') {
