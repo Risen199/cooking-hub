@@ -1,289 +1,62 @@
-# ============================================
-# HUB REDIRECTS (Township Pages)
-# ============================================
-[[redirects]]
-  from = "/val"
-  to = "/hub.html?township=VAL"
-  status = 200
+# Hub redirects
+/VAL          /hub.html?township=VAL    200
+/BLB     /hub.html?township=BLB    200
+/bedworthpark /hub.html?township=BDP    200
+/MAN     /hub.html?township=MAN    200
+/seshego     /hub.html?township=SES    200
+/Vanderbijlpark     /hub.html?township=VDK    200
+ 
 
-[[redirects]]
-  from = "/blouberg"
-  to = "/hub.html?township=BLB"
-  status = 200
+# Store redirects
+/aunty-thandi /store-view.html?storeId=blb_01 200
+/bontles /store-view.html?storeId=bdp_01 200
+/mama-lerato /store-view.html?storeId=bdp_02 200
+/sis-portia /store-view.html?storeId=bdp_03 200
+/aunty-mapula /store-view.html?storeId=bdp_04 200
+/chef-thabo /store-view.html?storeId=bdp_05 200
+/mama-lebo /store-view.html?storeId=blb_02 200
+/sis-bongi /store-view.html?storeId=blb_03 200
+/mama-nomsa /store-view.html?storeId=blb_04 200
+/mama-pinky /store-view.html?storeId=blb_05 200
+/sis-lerato /store-view.html?storeId=blb_06 200
+/sis-pabalo /store-view.html?storeId=blb_07 200
+/aunty-zinhle /store-view.html?storeId=blb_08 200
+/mama-dineo /store-view.html?storeId=man_01 200
+/sis-thandi /store-view.html?storeId=man_02 200
+/aunty-naledi /store-view.html?storeId=man_03 200
+/mama-boitumelo /store-view.html?storeId=man_04 200
+/sis-lindiwe /store-view.html?storeId=man_05 200
+/mama-tumi /store-view.html?storeId=man_06 200
+/sis-nompumelelo /store-view.html?storeId=man_07 200
+/aunty-busisiwe /store-view.html?storeId=man_08 200
+/bazooka /store-view.html?storeId=new_01 200
+/sis-tumi /store-view.html?storeId=ses_01 200
+/mama-sipho /store-view.html?storeId=ses_02 200
+/aunty-lulu /store-view.html?storeId=ses_03 200
+/sis-mpho /store-view.html?storeId=ses_04 200
+/mama-kefilwe /store-view.html?storeId=ses_05 200
+/sis-neo /store-view.html?storeId=ses_06 200
+/mama-tshidi /store-view.html?storeId=ses_07 200
+/aunty-vuyo /store-view.html?storeId=ses_08 200
+/skile /store-view.html?storeId=val_01 200
+/nomsa-dish /store-view.html?storeId=vdk_01 200
+/mama-rose /store-view.html?storeId=vdk_02 200
+/sis-pinky /store-view.html?storeId=vdk_03 200
+/aunty-joyce /store-view.html?storeId=vdk_04 200
+/chef-bongi /store-view.html?storeId=vdk_05 200
 
-[[redirects]]
-  from = "/bedworthpark"
-  to = "/hub.html?township=BDP"
-  status = 200
+# API routes - DON'T redirect these
+/api/*        /.netlify/functions/:splat          200
 
-[[redirects]]
-  from = "/mankweng"
-  to = "/hub.html?township=MAN"
-  status = 200
+# Don't redirect actual files
+/*.html       ! 
+/*.js         ! 
+/*.css        ! 
+/*.png        ! 
+/*.jpg        ! 
+/*.webp       ! 
+/*.svg        ! 
+/*.ico        ! 
 
-[[redirects]]
-  from = "/seshego"
-  to = "/hub.html?township=SES"
-  status = 200
-
-[[redirects]]
-  from = "/Vanderbijlpark"
-  to = "/hub.html?township=VDK"
-  status = 200
-
-# ============================================
-# STORE REDIRECTS (Individual Kitchen Pages)
-# ============================================
-[[redirects]]
-  from = "/aunty-thandi"
-  to = "/store-view.html?storeId=blb_01"
-  status = 200
-
-[[redirects]]
-  from = "/bontles"
-  to = "/store-view.html?storeId=bdp_01"
-  status = 200
-
-[[redirects]]
-  from = "/mama-lerato"
-  to = "/store-view.html?storeId=bdp_02"
-  status = 200
-
-[[redirects]]
-  from = "/sis-portia"
-  to = "/store-view.html?storeId=bdp_03"
-  status = 200
-
-[[redirects]]
-  from = "/aunty-mapula"
-  to = "/store-view.html?storeId=bdp_04"
-  status = 200
-
-[[redirects]]
-  from = "/chef-thabo"
-  to = "/store-view.html?storeId=bdp_05"
-  status = 200
-
-[[redirects]]
-  from = "/mama-lebo"
-  to = "/store-view.html?storeId=blb_02"
-  status = 200
-
-[[redirects]]
-  from = "/sis-bongi"
-  to = "/store-view.html?storeId=blb_03"
-  status = 200
-
-[[redirects]]
-  from = "/mama-nomsa"
-  to = "/store-view.html?storeId=blb_04"
-  status = 200
-
-[[redirects]]
-  from = "/mama-pinky"
-  to = "/store-view.html?storeId=blb_05"
-  status = 200
-
-[[redirects]]
-  from = "/sis-lerato"
-  to = "/store-view.html?storeId=blb_06"
-  status = 200
-
-[[redirects]]
-  from = "/sis-pabalo"
-  to = "/store-view.html?storeId=blb_07"
-  status = 200
-
-[[redirects]]
-  from = "/aunty-zinhle"
-  to = "/store-view.html?storeId=blb_08"
-  status = 200
-
-[[redirects]]
-  from = "/mama-dineo"
-  to = "/store-view.html?storeId=man_01"
-  status = 200
-
-[[redirects]]
-  from = "/sis-thandi"
-  to = "/store-view.html?storeId=man_02"
-  status = 200
-
-[[redirects]]
-  from = "/aunty-naledi"
-  to = "/store-view.html?storeId=man_03"
-  status = 200
-
-[[redirects]]
-  from = "/mama-boitumelo"
-  to = "/store-view.html?storeId=man_04"
-  status = 200
-
-[[redirects]]
-  from = "/sis-lindiwe"
-  to = "/store-view.html?storeId=man_05"
-  status = 200
-
-[[redirects]]
-  from = "/mama-tumi"
-  to = "/store-view.html?storeId=man_06"
-  status = 200
-
-[[redirects]]
-  from = "/sis-nompumelelo"
-  to = "/store-view.html?storeId=man_07"
-  status = 200
-
-[[redirects]]
-  from = "/aunty-busisiwe"
-  to = "/store-view.html?storeId=man_08"
-  status = 200
-
-[[redirects]]
-  from = "/bazooka"
-  to = "/store-view.html?storeId=new_01"
-  status = 200
-
-[[redirects]]
-  from = "/sis-tumi"
-  to = "/store-view.html?storeId=ses_01"
-  status = 200
-
-[[redirects]]
-  from = "/mama-sipho"
-  to = "/store-view.html?storeId=ses_02"
-  status = 200
-
-[[redirects]]
-  from = "/aunty-lulu"
-  to = "/store-view.html?storeId=ses_03"
-  status = 200
-
-[[redirects]]
-  from = "/sis-mpho"
-  to = "/store-view.html?storeId=ses_04"
-  status = 200
-
-[[redirects]]
-  from = "/mama-kefilwe"
-  to = "/store-view.html?storeId=ses_05"
-  status = 200
-
-[[redirects]]
-  from = "/sis-neo"
-  to = "/store-view.html?storeId=ses_06"
-  status = 200
-
-[[redirects]]
-  from = "/mama-tshidi"
-  to = "/store-view.html?storeId=ses_07"
-  status = 200
-
-[[redirects]]
-  from = "/aunty-vuyo"
-  to = "/store-view.html?storeId=ses_08"
-  status = 200
-
-[[redirects]]
-  from = "/skile"
-  to = "/store-view.html?storeId=val_01"
-  status = 200
-
-[[redirects]]
-  from = "/nomsa-dish"
-  to = "/store-view.html?storeId=vdk_01"
-  status = 200
-
-[[redirects]]
-  from = "/mama-rose"
-  to = "/store-view.html?storeId=vdk_02"
-  status = 200
-
-[[redirects]]
-  from = "/sis-pinky"
-  to = "/store-view.html?storeId=vdk_03"
-  status = 200
-
-[[redirects]]
-  from = "/aunty-joyce"
-  to = "/store-view.html?storeId=vdk_04"
-  status = 200
-
-[[redirects]]
-  from = "/chef-bongi"
-  to = "/store-view.html?storeId=vdk_05"
-  status = 200
-
-# ============================================
-# PROTECT ACTUAL FILES (Don't redirect these)
-# ============================================
-[[redirects]]
-  from = "/hub.html"
-  to = "/hub.html"
-  status = 200
-
-[[redirects]]
-  from = "/store-view.html"
-  to = "/store-view.html"
-  status = 200
-
-[[redirects]]
-  from = "/index.html"
-  to = "/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/*.html"
-  to = "/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.js"
-  to = "/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.css"
-  to = "/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.png"
-  to = "/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.jpg"
-  to = "/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.webp"
-  to = "/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.svg"
-  to = "/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*.ico"
-  to = "/:splat"
-  status = 200
-
-# ============================================
-# API ROUTES (Netlify Functions)
-# ============================================
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-
-# ============================================
-# FALLBACK (Homepage)
-# ============================================
-[[redirects]]
-  from = "/"
-  to = "/index.html"
-  status = 200
+# Fallback - only for completely unknown paths
+/             /index.html                          200
