@@ -164,6 +164,20 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+
+    // GET SLUG FROM URL PARAMETERS (THIS WAS NEVER ADDED)
+const urlParams = new URLSearchParams(window.location.search);
+const hubSlug = urlParams.get('slug');
+
+console.log('Hub slug from URL:', hubSlug); // Check if this appears
+
+if (hubSlug) {
+  // Now use this to load hub data
+  loadHubData(hubSlug);
+} else {
+  console.error('No hub slug found');
+}
+
     const API_URL = '/.netlify/functions/handle-order';
 
     // Get parameters from URL
