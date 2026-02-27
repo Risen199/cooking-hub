@@ -163,33 +163,36 @@
   </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   const API_URL = '/.netlify/functions/handle-order';
 
-  // Get slug from URL in this order:
-  // 1. From query parameter (?slug=blouberg) — set by _redirects
-  // 2. From path (/blouberg) — direct visit
+  // Get parameters from URL
   const urlParams = new URLSearchParams(window.location.search);
-  let hubSlug = urlParams.get('slug');
+  let townshipCode = urlParams.get('township');  // Old way: ?township=BLB
+  let hubSlug = urlParams.get('slug');           // New way: ?slug=blouberg
   
-  // If no slug in query, try to get from path
-  if (!hubSlug) {
+  // Also try to get from path for clean URLs (/blouberg)
+  if (!townshipCode && !hubSlug) {
     let path = window.location.pathname;
-    // Remove leading/trailing slashes, ignore actual filenames
-    hubSlug = path.replace(/^\//, '').replace(/\/$/, '');
+    let possibleSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    // If it's a known file like hub.html, ignore it
-    if (hubSlug === 'hub.html' || hubSlug === 'index.html' || hubSlug === '') {
-      hubSlug = null;
+    // If it's not a known file, treat it as a slug
+    if (possibleSlug && 
+        possibleSlug !== 'hub.html' && 
+        possibleSlug !== 'index.html' && 
+        possibleSlug !== 'store-view.html' &&
+        possibleSlug !== 'contact.html') {
+      hubSlug = possibleSlug;
     }
   }
 
-  console.log('🔍 Looking for hub with slug:', hubSlug);
+  console.log('🔍 Looking for hub with:', { townshipCode, hubSlug });
 
-  // Load hub configuration
-  async function loadHubConfig() {
-    if (!hubSlug) {
-      console.error('No hub slug found');
+  // Main initialization
+  async function initializePage() {
+    if (!townshipCode && !hubSlug) {
+      console.error('No hub identifier found');
       document.getElementById('township-name').textContent = 'Hub not found';
       document.getElementById('stores-container').innerHTML = `
         <div class="col-12 text-center py-5">
@@ -197,39 +200,88 @@
           <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
         </div>
       `;
-      return null;
+      return;
     }
 
     try {
-      // Try to find hub by slug - direct API call
-      const response = await fetch(`${API_URL}?action=getHubBySlug&slug=${hubSlug}`);
-      const data = await response.json();
+      let hubData = null;
       
-      if (data.success && data.hub) {
-        console.log('✅ Found hub:', data.hub.Hub_Name);
-        return {
-          name: data.hub.Hub_Name,
-          hero: data.hub.Hero_Image_URL,
-          slogan: data.hub.Slogan || 'The Flavours of',
-          color: data.hub.Brand_Color || '#ff0000',
-          storeCountText: data.hub.StoreCountText || 'Legendary Kitchens',
-          townshipCode: data.hub.Township_Code
-        };
-      } else {
-        console.error('Hub not found for slug:', hubSlug);
+      // Try to find hub by township code first (old way)
+      if (townshipCode) {
+        console.log('🔍 Trying by township code:', townshipCode);
+        const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
+        const data = await response.json();
+        
+        if (data.success && data.hub) {
+          hubData = data.hub;
+          console.log('✅ Found by township code:', hubData.Hub_Name);
+        }
+      }
+      
+      // If not found and we have a slug, try by slug
+      if (!hubData && hubSlug) {
+        console.log('🔍 Trying by slug:', hubSlug);
+        
+        // First, get all hubs since we don't have a getHubBySlug function yet
+        const response = await fetch(`${API_URL}?action=hubs`);
+        const data = await response.json();
+        
+        if (data.success && data.hubs) {
+          // Find hub where slug matches (case insensitive)
+          hubData = data.hubs.find(h => 
+            h.slug && h.slug.toLowerCase() === hubSlug.toLowerCase()
+          );
+          
+          if (hubData) {
+            console.log('✅ Found by slug:', hubData.Hub_Name);
+            // Set townshipCode for store loading
+            townshipCode = hubData.Township_Code;
+          }
+        }
+      }
+
+      if (!hubData) {
+        console.error('No hub found');
         document.getElementById('township-name').textContent = 'Hub not found';
         document.getElementById('stores-container').innerHTML = `
           <div class="col-12 text-center py-5">
-            <h3 class="text-muted">Hub "${hubSlug}" not found</h3>
+            <h3 class="text-muted">Hub not found</h3>
             <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
           </div>
         `;
-        return null;
+        return;
       }
+
+      // Update page with hub data
+      document.getElementById('township-name').textContent = hubData.Hub_Name;
+      document.getElementById('footer-township').textContent = hubData.Hub_Name.toUpperCase();
+      document.getElementById('store-count-text').textContent = hubData.StoreCountText || 'Legendary Kitchens';
+      document.title = `${hubData.Hub_Name} — BEIJU`;
+      
+      if (hubData.Brand_Color) {
+        document.documentElement.style.setProperty('--brand-red', hubData.Brand_Color);
+      }
+      
+      const heroSection = document.getElementById('hero-section');
+      if (hubData.Hero_Image_URL) {
+        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${hubData.Hero_Image_URL}')`;
+      }
+      
+      // Update hero text
+      const heroTitle = document.querySelector('.hero-home .display-2');
+      heroTitle.innerHTML = `${hubData.Slogan || 'The Flavours of'} <span class="brand-red">${hubData.Hub_Name}</span>`;
+
+      // Load stores using township code
+      await loadStores(hubData.Township_Code);
+
     } catch (error) {
-      console.error('Error loading hub:', error);
-      document.getElementById('township-name').textContent = 'Error loading hub';
-      return null;
+      console.error('Error initializing page:', error);
+      document.getElementById('stores-container').innerHTML = `
+        <div class="col-12 text-center py-5">
+          <h3 class="text-danger">Error loading hub</h3>
+          <p class="text-muted">${error.message}</p>
+        </div>
+      `;
     }
   }
 
@@ -301,31 +353,6 @@
         </div>
       `;
     }
-  }
-
-  // Main initialization
-  async function initializePage() {
-    const config = await loadHubConfig();
-    if (!config) return;
-
-    // Update page with hub config
-    document.getElementById('township-name').textContent = config.name;
-    document.getElementById('footer-township').textContent = config.name.toUpperCase();
-    document.getElementById('store-count-text').textContent = config.storeCountText;
-    document.title = `${config.name} — BEIJU`;
-    document.documentElement.style.setProperty('--brand-red', config.color);
-    
-    const heroSection = document.getElementById('hero-section');
-    if (config.hero) {
-      heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${config.hero}')`;
-    }
-    
-    // Update hero text
-    const heroTitle = document.querySelector('.hero-home .display-2');
-    heroTitle.innerHTML = `${config.slogan} <span class="brand-red">${config.name}</span>`;
-
-    // Load stores using township code
-    await loadStores(config.townshipCode);
   }
 
   // Start the page
