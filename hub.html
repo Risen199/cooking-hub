@@ -163,60 +163,83 @@
   </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
+    <script>
   const API_URL = '/.netlify/functions/handle-order';
 
-  document.addEventListener('DOMContentLoaded', async function () {
-    // Get parameters from URL (old way)
-    const urlParams = new URLSearchParams(window.location.search);
-    const townshipCode = urlParams.get('township');
-    const slugParam = urlParams.get('slug');
-    
-    // Get clean slug from URL path (new way) — e.g., /blouberg
+  // Get parameters from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  let townshipCode = urlParams.get('township');  // Old way: ?township=BLB
+  let hubSlug = urlParams.get('slug');           // New way: ?slug=blouberg
+  
+  // Also try to get from path for clean URLs (/blouberg)
+  if (!townshipCode && !hubSlug) {
     let path = window.location.pathname;
-    let pathSlug = path.replace(/^\//, '').replace(/\/$/, '');
+    let possibleSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    // If pathSlug is a known filename, ignore it
-    if (pathSlug === 'hub.html' || pathSlug === 'index.html' || pathSlug === 'store-view.html' || pathSlug === 'contact.html') {
-      pathSlug = null;
+    // If it's not a known file, treat it as a slug
+    if (possibleSlug && 
+        possibleSlug !== 'hub.html' && 
+        possibleSlug !== 'index.html' && 
+        possibleSlug !== 'store-view.html' &&
+        possibleSlug !== 'contact.html') {
+      hubSlug = possibleSlug;
+    }
+  }
+
+  console.log('🔍 Looking for hub with:', { townshipCode, hubSlug });
+
+  // Main initialization
+  async function initializePage() {
+    if (!townshipCode && !hubSlug) {
+      console.error('No hub identifier found');
+      document.getElementById('township-name').textContent = 'Hub not found';
+      document.getElementById('stores-container').innerHTML = `
+        <div class="col-12 text-center py-5">
+          <h3 class="text-muted">No hub specified</h3>
+          <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
+        </div>
+      `;
+      return;
     }
 
-    console.log('🔍 Looking for hub with:', { pathSlug, slugParam, townshipCode });
-
     try {
-      // Fetch ALL hubs (just like stores fetch in store-view.html)
-      const hubsRes = await fetch(`${API_URL}?action=hubs`);
-      const hubsData = await hubsRes.json();
+      let hubData = null;
       
-      if (!hubsData.success) throw new Error('Failed to load hubs');
-
-      let hub = null;
-
-      // 1. Try by path slug first (clean URL) — e.g., /blouberg
-      if (pathSlug) {
-        console.log('🔍 Trying hub by path slug:', pathSlug);
-        hub = hubsData.hubs.find(h => 
-          h.slug && h.slug.toLowerCase() === pathSlug.toLowerCase()
-        );
+      // Try to find hub by township code first (old way)
+      if (townshipCode) {
+        console.log('🔍 Trying by township code:', townshipCode);
+        const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
+        const data = await response.json();
+        
+        if (data.success && data.hub) {
+          hubData = data.hub;
+          console.log('✅ Found by township code:', hubData.Hub_Name);
+        }
+      }
+      
+      // If not found and we have a slug, try by slug
+      if (!hubData && hubSlug) {
+        console.log('🔍 Trying by slug:', hubSlug);
+        
+        // First, get all hubs since we don't have a getHubBySlug function yet
+        const response = await fetch(`${API_URL}?action=hubs`);
+        const data = await response.json();
+        
+        if (data.success && data.hubs) {
+          // Find hub where slug matches (case insensitive)
+          hubData = data.hubs.find(h => 
+            h.slug && h.slug.toLowerCase() === hubSlug.toLowerCase()
+          );
+          
+          if (hubData) {
+            console.log('✅ Found by slug:', hubData.Hub_Name);
+            // Set townshipCode for store loading
+            townshipCode = hubData.Township_Code;
+          }
+        }
       }
 
-      // 2. Try by slug parameter second — e.g., ?slug=blouberg
-      if (!hub && slugParam) {
-        console.log('🔍 Trying hub by slug param:', slugParam);
-        hub = hubsData.hubs.find(h => 
-          h.slug && h.slug.toLowerCase() === slugParam.toLowerCase()
-        );
-      }
-
-      // 3. Try by township code third (old way) — e.g., ?township=BLB
-      if (!hub && townshipCode) {
-        console.log('🔍 Trying hub by township code:', townshipCode);
-        hub = hubsData.hubs.find(h => h.Township_Code === townshipCode);
-      }
-
-      // If no hub found, show error
-      if (!hub) {
+      if (!hubData) {
         console.error('No hub found');
         document.getElementById('township-name').textContent = 'Hub not found';
         document.getElementById('stores-container').innerHTML = `
@@ -227,42 +250,39 @@
         `;
         return;
       }
-
-      console.log('✅ Found hub:', hub.Hub_Name);
-
-      // Update page with hub data
-      document.getElementById('township-name').textContent = hub.Hub_Name;
-      document.getElementById('footer-township').textContent = hub.Hub_Name.toUpperCase();
-      document.getElementById('store-count-text').textContent = hub.StoreCountText || 'Legendary Kitchens';
-      document.title = `${hub.Hub_Name} — BEIJU`;
       
-      if (hub.Brand_Color) {
-        document.documentElement.style.setProperty('--brand-red', hub.Brand_Color);
+      // Update page with hub data
+      document.getElementById('township-name').textContent = hubData.Hub_Name;
+      document.getElementById('footer-township').textContent = hubData.Hub_Name.toUpperCase();
+      document.getElementById('store-count-text').textContent = hubData.StoreCountText || 'Legendary Kitchens';
+      document.title = `${hubData.Hub_Name} — BEIJU`;
+      
+      if (hubData.Brand_Color) {
+        document.documentElement.style.setProperty('--brand-red', hubData.Brand_Color);
       }
       
       const heroSection = document.getElementById('hero-section');
-      if (hub.Hero_Image_URL) {
-        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${hub.Hero_Image_URL}')`;
+      if (hubData.Hero_Image_URL) {
+        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${hubData.Hero_Image_URL}')`;
       }
       
       // Update hero text
       const heroTitle = document.querySelector('.hero-home .display-2');
-      heroTitle.innerHTML = `${hub.Slogan || 'The Flavours of'} <span class="brand-red">${hub.Hub_Name}</span>`;
+      heroTitle.innerHTML = `${hubData.Slogan || 'The Flavours of'} <span class="brand-red">${hubData.Hub_Name}</span>`;
 
       // Load stores using township code
-      await loadStores(hub.Township_Code);
+      await loadStores(hubData.Township_Code);
 
     } catch (error) {
-      console.error('Error loading hub:', error);
-      document.getElementById('township-name').textContent = 'Error loading hub';
+      console.error('Error initializing page:', error);
       document.getElementById('stores-container').innerHTML = `
         <div class="col-12 text-center py-5">
-          <h3 class="text-danger">Failed to load hub</h3>
+          <h3 class="text-danger">Error loading hub</h3>
           <p class="text-muted">${error.message}</p>
         </div>
       `;
     }
-  });
+  }
 
   // Fetch and display stores
   async function loadStores(townshipCode) {
@@ -333,6 +353,11 @@
       `;
     }
   }
+
+  // Start the page
+  initializePage();
 </script>
+</body>
+
 </body>
 </html>
