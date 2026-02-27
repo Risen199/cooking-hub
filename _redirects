@@ -1,8 +1,8 @@
 # Hub redirects
-/VAL          /hub.html?township=VAL    200
-/BLB     /hub.html?township=BLB    200
+/val          /hub.html?township=VAL    200
+/blouberg     /hub.html?township=BLB    200
 /bedworthpark /hub.html?township=BDP    200
-/MAN     /hub.html?township=MAN    200
+/mankweng     /hub.html?township=MAN    200
 /seshego     /hub.html?township=SES    200
 /Vanderbijlpark     /hub.html?township=VDK    200
  
@@ -44,6 +44,22 @@
 /sis-pinky /store-view.html?storeId=vdk_03 200
 /aunty-joyce /store-view.html?storeId=vdk_04 200
 /chef-bongi /store-view.html?storeId=vdk_05 200
+
+[[redirects]]
+  from = "/*"
+  to = "/store-view.html"
+  status = 200
+  force = false
+
+[[redirects]]
+  from = "/hub.html"
+  to = "/hub.html"
+  status = 200
+
+[[redirects]]
+  from = "/index.html"
+  to = "/index.html"
+  status = 200
 
 # API routes - DON'T redirect these
 /api/*        /.netlify/functions/:splat          200
