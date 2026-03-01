@@ -176,30 +176,6 @@ exports.handler = async (event) => {
 
       // CREATE ORDER     
       if (data.action === 'order') {
-         // ===== NEW: Get IP and User Agent =====
-  const userIP = event.headers['x-forwarded-for'] || event.headers['client-ip'] || 'unknown';
-  const userAgent = event.headers['user-agent'] || 'unknown';
-  
-  // Get consent from request (you need to send this from frontend)
-  const consentGiven = data.consentGiven || false;
-  const consentTimestamp = data.consentTimestamp || new Date().toISOString();
-  
-  // Log consent to database
-  const { error: consentError } = await supabase
-    .from('consent_logs')
-    .insert([{
-      customer_phone: data.Customer_Name ? 'pending' : null, // Will update when we get WhatsApp
-      consent_given: consentGiven,
-      consent_timestamp: consentTimestamp,
-      ip_address: userIP,
-      user_agent: userAgent,
-      order_id: 'pending_' + Date.now() // Temporary ID
-    }]);
-  
-  if (consentError) {
-    console.error('Consent logging error:', consentError);
-    // Don't stop order if consent logging fails
-    
         const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
         const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;

@@ -177,7 +177,6 @@
 </head>
 <body data-wa-number="27726515909">
 
-  <!-- Item Detail Modal -->
   <div id="item-detail-modal">
     <div class="modal-content">
       <h4 id="detail-name"></h4>
@@ -187,22 +186,21 @@
     </div>
   </div>
 
-  <!-- Cart Overlay -->
   <div class="cart-overlay" id="modal-overlay"></div>
 
-  <!-- Cart Drawer -->
   <div id="cart-drawer">
     <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
       <h5 class="mb-0 fw-bold">Your Order</h5>
       <button class="btn-close" id="close-cart"></button>
     </div>
-    <div id="cart-items-list" class="p-3"></div>
+    <div id="cart-items-list" class="p-3">
+      <p class="text-muted">Your basket is empty.</p>
+    </div>
     <div class="p-3" style="position: absolute; bottom: 0; width: 100%; background: white; border-top: 1px solid #eee;">
       <button class="btn btn-success w-100 py-3 btn-checkout" id="checkout-btn">CHECK OUT</button>
     </div>
   </div>
 
-  <!-- Navigation -->
   <nav class="navbar navbar-expand-lg sticky-top shadow-sm">
     <div class="container">
       <a class="navbar-brand" href="index.html">BE<span class="brand-red">IJU</span></a>
@@ -210,7 +208,6 @@
     </div>
   </nav>
 
-  <!-- Hero Section -->
   <section class="hero">
     <div class="hero-content container">
       <h1 class="display-3 fw-bold" id="store-name">Loading...</h1>
@@ -222,7 +219,6 @@
     </div>
   </section>
 
-  <!-- Menu Section -->
   <section class="py-5 bg-light">
     <div class="container">
       <h2 class="text-center mb-5 fw-bold" style="color: var(--brand-red);">Our Menu</h2>
@@ -236,7 +232,6 @@
     </div>
   </section>
 
-  <!-- Cart Summary Bar -->
   <div class="cart-summary shadow-lg" id="cart-summary">
     <div class="container d-flex justify-content-between align-items-center">
       <div>
@@ -247,7 +242,6 @@
     </div>
   </div>
 
-  <!-- Footer -->
   <footer class="big-footer text-center">
     <div class="container">
       <div class="footer-logo mb-2">BE<span class="text-white">IJU</span></div>
@@ -266,10 +260,9 @@
     </div>
   </footer>
 
-  <!-- WhatsApp Float -->
   <a href="https://wa.me/27726515909" class="whatsapp-float" id="wa-float">💬</a>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap/5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   const API_URL = '/.netlify/functions/handle-order';
 
@@ -279,25 +272,6 @@
     prepMinutes: 60
   };
 
-  // Parse time string to hours/minutes object
-  function parseTime(timeStr) {
-    if (!timeStr) return { h: 8, m: 30 };
-    let str = String(timeStr).trim();
-    if (str.includes('AM') || str.includes('PM')) {
-      const [timePart] = str.split(' ');
-      const [hour, minute] = timePart.split(':').map(Number);
-      let h = hour;
-      if (str.includes('PM') && h < 12) h += 12;
-      if (str.includes('AM') && h === 12) h = 0;
-      return { h, m: minute || 0 };
-    }
-    const parts = str.split(':');
-    const h = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10) || 0;
-    return isNaN(h) ? { h: 8, m: 30 } : { h, m };
-  }
-
-  // Generate available pickup time slots
   function generatePickupSlots() {
     const now = new Date();
     let maxPrep = 60;
@@ -347,64 +321,36 @@
     return slots.length === 0 ? { error: "No available pickup times." } : { slots };
   }
 
-  // Update cart UI
-  function updateCartUI() {
-    const cart = window.cart || [];
-    const cartCountEl = document.getElementById('cart-count');
-    const cartTotalEl = document.getElementById('cart-total');
-    const cartItemsList = document.getElementById('cart-items-list');
-
-    const count = cart.reduce((sum, item) => sum + item.qty, 0);
-    const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    cartCountEl.textContent = count;
-    cartTotalEl.textContent = `R${total.toFixed(2)}`;
-
-    if (count === 0) {
-      cartItemsList.innerHTML = '<p class="text-muted">Your basket is empty.</p>';
-    } else {
-      let html = '';
-      cart.forEach(item => {
-        html += `
-          <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
-            <div>
-              <strong>${item.name}</strong><br>
-              <small class="text-muted">R${item.price} × ${item.qty}</small>
-            </div>
-            <div>
-              <button class="btn btn-sm btn-outline-danger remove-item" data-id="${item.id}">✕</button>
-            </div>
-          </div>
-        `;
-      });
-      cartItemsList.innerHTML = html;
-
-      document.querySelectorAll('.remove-item').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const id = this.dataset.id;
-          const index = cart.findIndex(i => i.id === id);
-          if (index > -1) {
-            if (cart[index].qty > 1) cart[index].qty--;
-            else cart.splice(index, 1);
-            updateCartUI();
-          }
-        });
-      });
+  function parseTime(timeStr) {
+    if (!timeStr) return { h: 8, m: 30 };
+    let str = String(timeStr).trim();
+    if (str.includes('AM') || str.includes('PM')) {
+      const [timePart] = str.split(' ');
+      const [hour, minute] = timePart.split(':').map(Number);
+      let h = hour;
+      if (str.includes('PM') && h < 12) h += 12;
+      if (str.includes('AM') && h === 12) h = 0;
+      return { h, m: minute || 0 };
     }
+    const parts = str.split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) || 0;
+    return isNaN(h) ? { h: 8, m: 30 } : { h, m };
   }
 
-  // Main initialization
   document.addEventListener('DOMContentLoaded', async function () {
+    // Get storeId from URL params (old way)
     const urlParams = new URLSearchParams(window.location.search);
     const storeId = urlParams.get('storeId');
     const from = urlParams.get('from');
     const township = urlParams.get('township');
     
-    // Get clean slug from URL path (e.g., /mamas-kitchen)
+    // Get clean slug from URL path (new way)
     let path = window.location.pathname;
     let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    // Set back button href
     const backButton = document.getElementById('back-btn');
+
     if (from === 'hub' && township) {
       backButton.href = `hub.html?township=${township}`;
     } else {
@@ -417,7 +363,9 @@
       const storeData = await storeRes.json();
       if (!storeData.success) throw new Error('Failed to load stores');
 
-      // Find store by slug first, then by ID
+      // Try to find store by:
+      // 1. Clean slug first (new way)
+      // 2. Store ID second (old way)
       let store = null;
       
       if (cleanSlug && cleanSlug !== 'store-view.html' && cleanSlug !== 'hub.html' && cleanSlug !== '') {
@@ -443,7 +391,6 @@
 
       console.log('✅ Found store:', store.Name);
 
-      // Show closed alert if needed
       if (store.Temporarily_Closed) {
         const heroContent = document.querySelector('.hero-content');
         heroContent.innerHTML += `
@@ -455,11 +402,10 @@
         `;
       }
 
-      // Update store info
       document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
       document.getElementById('store-slogan').textContent = store.Slogan || '';
       
-      // Update hero background
+      // Update hero background with store's actual image
       const heroSection = document.querySelector('.hero');
       if (store.Hero_URL) {
         heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${store.Hero_URL}')`;
@@ -476,20 +422,17 @@
         document.getElementById('description-text').textContent = store.Area_Description.replace(/"/g, '');
       }
 
-      // Set WhatsApp number
       document.body.dataset.waNumber = store.WhatsApp || '27726515909';
       document.getElementById('wa-float').href = `https://wa.me/${store.WhatsApp || '27726515909'}`;
       
-      // Apply brand color
       const primaryColor = store.Primary_Color || '#ff0000';
       document.documentElement.style.setProperty('--brand-red', primaryColor);
 
-      // Set store hours
       storeHours.opening = store.Opening_Time_Clean || "08:30";
       storeHours.closing = store.Closing_Time_Clean || "18:00";
       storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
 
-      // Load menu
+      // Load menu using store ID
       const menuRes = await fetch(`${API_URL}?action=menu&storeId=${store.Store_ID}`);
       const menuData = await menuRes.json();
       if (!menuData.success) throw new Error('Failed to load menu');
@@ -501,7 +444,7 @@
         return;
       }
 
-      // Build menu HTML
+      // Build menu HTML with images
       let menuHtml = '';
       menuData.menu.forEach(item => {
         const itemImage = item.Image_URL || 'assets/images/default-food.jpg';
@@ -525,14 +468,54 @@
       menuContainer.innerHTML = menuHtml;
 
       // Initialize cart
-      window.cart = [];
+      let cart = [];
+      window.cart = cart;
 
-      // Cart UI elements
       const cartCountEl = document.getElementById('cart-count');
       const cartTotalEl = document.getElementById('cart-total');
       const cartSummary = document.getElementById('cart-summary');
       const cartDrawer = document.getElementById('cart-drawer');
       const cartOverlay = document.getElementById('modal-overlay');
+      const cartItemsList = document.getElementById('cart-items-list');
+
+      function updateCartUI() {
+        const count = cart.reduce((sum, item) => sum + item.qty, 0);
+        const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        cartCountEl.textContent = count;
+        cartTotalEl.textContent = `R${total.toFixed(2)}`;
+
+        if (count === 0) {
+          cartItemsList.innerHTML = '<p class="text-muted">Your basket is empty.</p>';
+        } else {
+          let html = '';
+          cart.forEach(item => {
+            html += `
+              <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom">
+                <div>
+                  <strong>${item.name}</strong><br>
+                  <small class="text-muted">R${item.price} × ${item.qty}</small>
+                </div>
+                <div>
+                  <button class="btn btn-sm btn-outline-danger remove-item" data-id="${item.id}">✕</button>
+                </div>
+              </div>
+            `;
+          });
+          cartItemsList.innerHTML = html;
+
+          document.querySelectorAll('.remove-item').forEach(btn => {
+            btn.addEventListener('click', function() {
+              const id = this.dataset.id;
+              const index = cart.findIndex(i => i.id === id);
+              if (index > -1) {
+                if (cart[index].qty > 1) cart[index].qty--;
+                else cart.splice(index, 1);
+                updateCartUI();
+              }
+            });
+          });
+        }
+      }
 
       // View Details Modal
       document.querySelectorAll('.view-details').forEach(link => {
@@ -550,21 +533,19 @@
         document.getElementById('item-detail-modal').style.display = 'none';
       });
 
-      // Add to Cart buttons
       document.querySelectorAll('.btn-add').forEach(button => {
         button.addEventListener('click', function() {
           const item = this.closest('.menu-item');
           const id = item.dataset.id;
           const name = item.dataset.name;
           const price = parseFloat(item.dataset.price);
-          const existing = window.cart.find(i => i.id === id);
+          const existing = cart.find(i => i.id === id);
           if (existing) existing.qty++;
-          else window.cart.push({ id, name, price, qty: 1 });
+          else cart.push({ id, name, price, qty: 1 });
           updateCartUI();
         });
       });
 
-      // Cart drawer controls
       cartSummary.addEventListener('click', () => {
         cartDrawer.classList.add('active');
         cartOverlay.classList.add('active');
@@ -580,14 +561,13 @@
         cartOverlay.classList.remove('active');
       });
 
-      // Checkout button
       document.getElementById('checkout-btn').addEventListener('click', function() {
         if (store.Temporarily_Closed) {
           alert(`🚫 ${store.Name} is Temporarily Closed\n\n${store.Status_Message || 'Orders are not being accepted at this time. Please check back later or try another kitchen.'}`);
           return;
         }
         
-        if (window.cart.length === 0) return;
+        if (cart.length === 0) return;
 
         const modal = document.createElement('div');
         modal.id = 'pickup-modal';
@@ -634,21 +614,17 @@
                 document.body.removeChild(modal);
                 document.getElementById('checkout-btn').click();
               });
-
-                const lines = window.cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
-                const total = window.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-
-              // When customer clicks confirm order
               document.getElementById('confirm-name').addEventListener('click', () => {
                 const name = document.getElementById('customer-name').value.trim();
-                const consentCheckbox = document.getElementById('consentCheckbox');
-                
-                if (!consentCheckbox.checked) {
-                  alert("Please agree to the terms to continue.");
+                if (!name) {
+                  alert("Please enter your name.");
                   return;
                 }
 
-                 fetch(API_URL, {
+                const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
+                const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+
+                fetch(API_URL, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -666,7 +642,8 @@
                 .then(data => {
                   if (data.success && data.whatsAppUrl) {
                     window.open(data.whatsAppUrl, '_blank');
-                    window.cart = [];
+                    cart = [];
+                    window.cart = cart;
                     updateCartUI();
                   } else {
                     alert("Order logging failed. Opening WhatsApp anyway...");
@@ -694,9 +671,6 @@
           document.body.removeChild(modal);
         });
       });
-
-      // Initialize cart UI
-      updateCartUI();
 
     } catch (error) {
       console.error('Error loading store:', error);
