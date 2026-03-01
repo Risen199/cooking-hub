@@ -45,6 +45,24 @@
 /aunty-joyce /store-view.html?storeId=vdk_04 200
 /chef-bongi /store-view.html?storeId=vdk_05 200
 
+# NEW HUB STORES (March 2026)
+/mama-winnie        /store-view.html?storeId=swt_01    200
+/sis-dudu           /store-view.html?storeId=swt_02    200
+/chef-sipho         /store-view.html?storeId=swt_03    200
+/aunty-rose         /store-view.html?storeId=swt_04    200
+/mama-mokopane      /store-view.html?storeId=mkn_01    200
+/sis-betty          /store-view.html?storeId=mkn_02    200
+/chef-james         /store-view.html?storeId=mkn_03    200
+/aunty-pinky        /store-view.html?storeId=mkn_04    200
+/mama-tembisa       /store-view.html?storeId=tem_01    200
+/sis-nomsa          /store-view.html?storeId=tem_02    200
+/chef-thabo-tem     /store-view.html?storeId=tem_03    200
+/aunty-lettie       /store-view.html?storeId=tem_04    200
+/mama-venda         /store-view.html?storeId=tho_01    200
+/sis-tshifhiwa      /store-view.html?storeId=tho_02    200
+/chef-mukhethwa     /store-view.html?storeId=tho_03    200
+/aunty-mulalo       /store-view.html?storeId=tho_04    200
+
 # API routes - DON'T redirect these
 /api/*        /.netlify/functions/:splat          200
 
