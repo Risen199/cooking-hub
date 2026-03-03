@@ -173,18 +173,7 @@
       font-size: 0.875rem;
       text-decoration: none;
     }
-    /* POPIA consent styles */
-    .consent-text {
-      font-size: 0.8rem;
-      color: #666;
-      margin-top: 8px;
-      text-align: left;
-    }
-    .form-check-label a {
-      color: var(--brand-red);
-      text-decoration: none;
-    }
-  </style>
+</style>
 </head>
 <body data-wa-number="27726515909">
 
@@ -215,9 +204,25 @@
   <nav class="navbar navbar-expand-lg sticky-top shadow-sm">
     <div class="container">
       <a class="navbar-brand" href="index.html">BE<span class="brand-red">IJU</span></a>
-      <a class="btn btn-outline-dark fw-bold" id="back-btn" href="index.html">← Back</a>
+      <a class="btn btn-outline-dark fw-bold" id="back-btn" href="javascript:void(0);" onclick="handleBackButton()">← Back</a>
     </div>
   </nav>
+
+  <script>
+    function handleBackButton() {
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from');
+      const township = params.get('township');
+      
+      if (from === 'hub' && township) {
+        window.location.href = `hub.html?township=${township}`;
+      } else if (document.referrer && document.referrer.includes(window.location.host)) {
+        window.history.back();
+      } else {
+        window.location.href = 'index.html';
+      }
+    }
+  </script>
 
   <section class="hero">
     <div class="hero-content container">
@@ -350,46 +355,23 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    // Get storeId from URL params (old way)
-    const urlParams = new URLSearchParams(window.location.search);
+    // Get storeId from URL params
+    const params = new URLSearchParams(window.location.search);
     const storeId = urlParams.get('storeId');
     const from = urlParams.get('from');
     const township = urlParams.get('township');
     
-    // Get clean slug from URL path (new way)
+    // Get clean slug from URL path
     let path = window.location.pathname;
     let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
-   const backButton = document.getElementById('back-btn');
-
-// Check if we have hub info in URL
-const urlParams = new URLSearchParams(window.location.search);
-const from = urlParams.get('from');
-const township = urlParams.get('township');
-
-if (from === 'hub' && township) {
-  backButton.href = `hub.html?township=${township}`;
-} else {
-  // Make it go back in history instead of always to index
-  backButton.addEventListener('click', function(e) {
-    e.preventDefault();
-    if (document.referrer && document.referrer.includes(window.location.host)) {
-      window.history.back();
-    } else {
-      window.location.href = 'index.html';
-    }
-  });
-}
-
     try {
       // Load all stores
       const storeRes = await fetch(`${API_URL}?action=stores`);
       const storeData = await storeRes.json();
       if (!storeData.success) throw new Error('Failed to load stores');
 
-      // Try to find store by:
-      // 1. Clean slug first (new way)
-      // 2. Store ID second (old way)
+      // Try to find store by clean slug first, then by storeId
       let store = null;
       
       if (cleanSlug && cleanSlug !== 'store-view.html' && cleanSlug !== 'hub.html' && cleanSlug !== '') {
@@ -633,12 +615,12 @@ if (from === 'hub' && township) {
                   <p class="text-muted mb-1">Your name</p>
                   <input type="text" id="customer-name" class="form-control mb-3" placeholder="e.g., Blessing" maxlength="20">
                   
-                  <!-- NEW: Phone number field (for POPIA and WasenderAPI) -->
+                  <!-- Phone number field -->
                   <p class="text-muted mb-1">WhatsApp number <span class="text-danger">*</span></p>
                   <input type="tel" id="customer-phone" class="form-control mb-2" placeholder="e.g., 0723456789" maxlength="15">
                   <small class="text-muted d-block mb-3">So the kitchen can confirm your order</small>
                   
-                  <!-- NEW: POPIA Consent Checkbox -->
+                  <!-- POPIA Consent Checkbox -->
                   <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="consent-checkbox">
                     <label class="form-check-label" for="consent-checkbox">
@@ -672,7 +654,7 @@ if (from === 'hub' && township) {
                   return;
                 }
                 
-                // Basic SA phone validation (allows 0723456789 or +27723456789)
+                // Basic SA phone validation
                 const cleanPhone = phone.replace(/\D/g, '');
                 if (cleanPhone.length < 10 || cleanPhone.length > 12) {
                   alert("Please enter a valid South African WhatsApp number (e.g., 0723456789)");
@@ -687,7 +669,7 @@ if (from === 'hub' && township) {
                 const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
                 const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
                 
-                // Format phone to international for WasenderAPI
+                // Format phone to international
                 const internationalPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
 
                 fetch(API_URL, {
@@ -697,13 +679,12 @@ if (from === 'hub' && township) {
                     action: 'order',
                     Store_ID: store.Store_ID,
                     Customer_Name: name,
-                    Customer_Phone: internationalPhone, // NEW: Send phone for POPIA
+                    Customer_Phone: internationalPhone,
                     Order_Items: lines.join('|'),
                     Total_Amount: total,
                     Pickup_Window: selectedTime,
                     Delivery_Type: 'Collection',
                     waNumber: document.body.dataset.waNumber,
-                    // NEW: POPIA consent data
                     consentGiven: true,
                     consentTimestamp: new Date().toISOString()
                   })
@@ -711,14 +692,12 @@ if (from === 'hub' && township) {
                 .then(res => res.json())
                 .then(data => {
                   if (data.success && data.whatsAppUrl) {
-                    // Store ID is embedded in the message for WasenderAPI later
                     window.open(data.whatsAppUrl, '_blank');
                     cart = [];
                     window.cart = cart;
                     updateCartUI();
                   } else {
                     alert("Order logging failed. Opening WhatsApp anyway...");
-                    // Include store ID in fallback message for WasenderAPI
                     const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                     const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -726,7 +705,6 @@ if (from === 'hub' && township) {
                 })
                 .catch(err => {
                   console.warn("Logging failed:", err);
-                  // Include store ID in fallback message for WasenderAPI
                   const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                   const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                   window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
