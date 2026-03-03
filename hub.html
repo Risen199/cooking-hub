@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Township 5 — BEIJU</title>
+  <title>Township Hub — BEIJU</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
     :root {
@@ -28,7 +28,7 @@
     }
     .brand-red { color: var(--brand-red); }
     .hero-home {
-      background: linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), 
+      background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), 
                   center/cover no-repeat;
       height: 80vh;
       display: flex;
@@ -133,8 +133,7 @@
         </div>
       </div>
       <div id="stores-container" class="row g-4">
-        <!-- Loading spinner -->
-        <div class="col-12 text-center py-5">
+      <div class="col-12 text-center py-5">
           <div class="loading-spinner"></div>
           <p class="mt-3 text-muted">Loading kitchens...</p>
         </div>
@@ -144,7 +143,7 @@
 
   <footer class="big-footer text-center">
     <div class="container">
-      <div class="footer-logo mb-2"><span id="footer-township">TOWNSHIP</span><span class="text-white">5</span></div>
+      <div class="footer-logo mb-2"><span id="footer-township">TOWNSHIP</span><span class="text-white">HUB</span></div>
       <p class="text-white opacity-75 mb-5">Empowering Local Kitchens through Digital Excellence.</p>
       
       <div class="row justify-content-center">
@@ -166,23 +165,26 @@
 <script>
   const API_URL = '/.netlify/functions/handle-order';
 
-  // Get parameters from URL
+  // Get parameters from URL - supports BOTH clean URLs and query params
   const urlParams = new URLSearchParams(window.location.search);
-  let townshipCode = urlParams.get('township');  // Old way: ?township=BLB
-  let hubSlug = urlParams.get('slug');           // New way: ?slug=blouberg
+  let townshipCode = urlParams.get('township');
+  let hubSlug = urlParams.get('slug');
   
-  // Also try to get from path for clean URLs (/blouberg)
+  // Extract slug from clean URL path (e.g., /blouberg → hub.html)
   if (!townshipCode && !hubSlug) {
     let path = window.location.pathname;
     let possibleSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    // If it's not a known file, treat it as a slug
+    // Exclude known static files
     if (possibleSlug && 
         possibleSlug !== 'hub.html' && 
         possibleSlug !== 'index.html' && 
         possibleSlug !== 'store-view.html' &&
-        possibleSlug !== 'contact.html') {
+        possibleSlug !== 'contact.html' &&
+        possibleSlug !== 'assets' &&
+        !possibleSlug.includes('.')) {
       hubSlug = possibleSlug;
+      console.log('🔍 Detected clean URL slug:', hubSlug);
     }
   }
 
@@ -196,6 +198,7 @@
       document.getElementById('stores-container').innerHTML = `
         <div class="col-12 text-center py-5">
           <h3 class="text-muted">No hub specified</h3>
+          <p class="text-muted">Please select a township from the homepage.</p>
           <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
         </div>
       `;
@@ -205,37 +208,43 @@
     try {
       let hubData = null;
       
-      // Try to find hub by township code first (old way)
-      if (townshipCode) {
-        console.log('🔍 Trying by township code:', townshipCode);
-        const response = await fetch(`${API_URL}?action=getHub&township=${townshipCode}`);
-        const data = await response.json();
+      // PRIORITY 1: Try slug first (clean URLs like /blouberg)
+      if (hubSlug) {
+        console.log('🔍 Trying to find hub by slug:', hubSlug);
         
-        if (data.success && data.hub) {
-          hubData = data.hub;
-          console.log('✅ Found by township code:', hubData.Hub_Name);
+        // Try direct slug lookup first
+        const hubRes = await fetch(`${API_URL}?action=getHubBySlug&slug=${encodeURIComponent(hubSlug)}`);
+        const hubDataResponse = await hubRes.json();
+        
+        if (hubDataResponse.success && hubDataResponse.hub) {
+          hubData = hubDataResponse.hub;
+          townshipCode = hubData.Township_Code;
+          console.log('✅ Found hub by slug:', hubData.Hub_Name);
+        } else {
+          // Fallback: try getAllHubs and find by slug manually
+          console.log('⚠️ Direct slug lookup failed, trying getAllHubs');
+          const allHubsRes = await fetch(`${API_URL}?action=getAllHubs`);
+          const allHubsData = await allHubsRes.json();
+          
+          if (allHubsData.success && allHubsData.hubs) {
+            hubData = allHubsData.hubs.find(h => h.slug === hubSlug);
+            if (hubData) {
+              townshipCode = hubData.Township_Code;
+              console.log('✅ Found hub by slug in getAllHubs:', hubData.Hub_Name);
+            }
+          }
         }
       }
       
-      // If not found and we have a slug, try by slug
-      if (!hubData && hubSlug) {
-        console.log('🔍 Trying by slug:', hubSlug);
+      // PRIORITY 2: Fallback to township code (old URLs like ?township=BLB)
+      if (!hubData && townshipCode) {
+        console.log('🔍 Trying by township code:', townshipCode);
+        const hubRes = await fetch(`${API_URL}?action=getHub&township=${encodeURIComponent(townshipCode)}`);
+        const hubDataResponse = await hubRes.json();
         
-        // First, get all hubs since we don't have a getHubBySlug function yet
-        const response = await fetch(`${API_URL}?action=hubs`);
-        const data = await response.json();
-        
-        if (data.success && data.hubs) {
-          // Find hub where slug matches (case insensitive)
-          hubData = data.hubs.find(h => 
-            h.slug && h.slug.toLowerCase() === hubSlug.toLowerCase()
-          );
-          
-          if (hubData) {
-            console.log('✅ Found by slug:', hubData.Hub_Name);
-            // Set townshipCode for store loading
-            townshipCode = hubData.Township_Code;
-          }
+        if (hubDataResponse.success && hubDataResponse.hub) {
+          hubData = hubDataResponse.hub;
+          console.log('✅ Found by township code:', hubData.Hub_Name);
         }
       }
 
@@ -245,6 +254,7 @@
         document.getElementById('stores-container').innerHTML = `
           <div class="col-12 text-center py-5">
             <h3 class="text-muted">Hub not found</h3>
+            <p class="text-muted">This township is not available yet.</p>
             <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
           </div>
         `;
@@ -252,26 +262,34 @@
       }
 
       // Update page with hub data
-      document.getElementById('township-name').textContent = hubData.Hub_Name;
-      document.getElementById('footer-township').textContent = hubData.Hub_Name.toUpperCase();
+      document.getElementById('township-name').textContent = hubData.Hub_Name || 'Township';
+      document.getElementById('footer-township').textContent = (hubData.Hub_Name || 'TOWNSHIP').toUpperCase();
       document.getElementById('store-count-text').textContent = hubData.StoreCountText || 'Legendary Kitchens';
-      document.title = `${hubData.Hub_Name} — BEIJU`;
+      document.title = `${hubData.Hub_Name || 'Township'} — BEIJU`;
       
+      // Apply brand color if available
       if (hubData.Brand_Color) {
         document.documentElement.style.setProperty('--brand-red', hubData.Brand_Color);
       }
       
+      // Apply hero background image
       const heroSection = document.getElementById('hero-section');
       if (hubData.Hero_Image_URL) {
-        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url('${hubData.Hero_Image_URL}')`;
+        heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('${hubData.Hero_Image_URL}')`;
+        heroSection.style.backgroundSize = 'cover';
+        heroSection.style.backgroundPosition = 'center';
       }
       
-      // Update hero text
+      // Update hero slogan
       const heroTitle = document.querySelector('.hero-home .display-2');
-      heroTitle.innerHTML = `${hubData.Slogan || 'The Flavours of'} <span class="brand-red">${hubData.Hub_Name}</span>`;
+      if (hubData.Slogan) {
+        heroTitle.innerHTML = `${hubData.Slogan} <span class="brand-red">${hubData.Hub_Name}</span>`;
+      } else {
+        heroTitle.innerHTML = `The Flavours of <span class="brand-red">${hubData.Hub_Name}</span>`;
+      }
 
-      // Load stores using township code
-      await loadStores(hubData.Township_Code);
+      // Load stores for this township
+      await loadStores(townshipCode);
 
     } catch (error) {
       console.error('Error initializing page:', error);
@@ -279,22 +297,23 @@
         <div class="col-12 text-center py-5">
           <h3 class="text-danger">Error loading hub</h3>
           <p class="text-muted">${error.message}</p>
+          <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
         </div>
       `;
     }
   }
 
-  // Fetch and display stores
+  // Fetch and display stores for this hub
   async function loadStores(townshipCode) {
     try {
-      const response = await fetch(`${API_URL}?action=stores&township=${townshipCode}`);
+      const response = await fetch(`${API_URL}?action=stores&township=${encodeURIComponent(townshipCode)}`);
       const data = await response.json();
 
       if (!data.success || !data.stores || data.stores.length === 0) {
         document.getElementById('stores-container').innerHTML = `
           <div class="col-12 text-center py-5">
             <h3 class="text-muted">No kitchens found</h3>
-            <p class="text-muted">Check back soon!</p>
+            <p class="text-muted">Check back soon for new partners!</p>
           </div>
         `;
         document.getElementById('store-count').textContent = '0';
@@ -304,18 +323,18 @@
       const stores = data.stores;
       document.getElementById('store-count').textContent = stores.length;
 
-      // Build store cards
+      // Build store cards with clean URLs
       const storesHTML = stores.map(store => {
         let statusBadge = '';
         if (store.Temporarily_Closed && store.Status_Message) {
           statusBadge = `<span class="badge bg-danger position-absolute" style="top:40px; left:10px; z-index:10;">${store.Status_Message}</span>`;  
         } else if (store.Temporarily_Closed) {
-          statusBadge = `<span class="badge bg-warning position-absolute" style="top:10px; left:10px;">Temporarily Closed</span>`;
+          statusBadge = `<span class="badge bg-warning text-dark position-absolute" style="top:10px; left:10px;">Temporarily Closed</span>`;
         }
         
         const storeImage = store.Hero_URL || store.Banner_URL || 'assets/images/image.webp';
         
-        // Use slug for clean URL if available
+        // Use slug for clean URL if available, fallback to storeId with from=hub parameter
         const storeLink = store.slug ? 
           `/${store.slug}` : 
           `store-view.html?storeId=${store.Store_ID}&from=hub&township=${townshipCode}`;
@@ -356,10 +375,6 @@
 
   // Start the page
   initializePage();
-</script>
+ </script>
 </body>
-
-</body>
-
-</body>
-</html>
+ </html>
