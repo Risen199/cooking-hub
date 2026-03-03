@@ -117,7 +117,7 @@ exports.handler = async (event) => {
         }
       }
 
-      // 4. GET HUB CONFIG
+      // 4. GET HUB BY TOWNSHIP CODE
       if (action === 'getHub') {
         const townshipCode = queryStringParameters?.township;
         if (!townshipCode) {
@@ -131,6 +131,52 @@ exports.handler = async (event) => {
           .from('Hub_Configs')
           .select('*')
           .eq('Township_Code', townshipCode)
+          .limit(1);
+        
+        if (error) throw error;
+        
+        if (hubs && hubs.length > 0) {
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ success: true, hub: hubs[0] })
+          };
+        } else {
+          return {
+            statusCode: 200,
+            body: JSON.stringify({ success: false, error: 'Hub not found' })
+          };
+        }
+      }
+
+      // 5. GET ALL HUBS (NEW - for slug lookup)
+      if (action === 'getAllHubs') {
+        const { data: hubs, error } = await supabase
+          .from('Hub_Configs')
+          .select('*')
+          .eq('Is_Active', 'checked');
+        
+        if (error) throw error;
+        
+        return {
+          statusCode: 200,
+          body: JSON.stringify({ success: true, hubs: hubs || [] })
+        };
+      }
+
+      // 6. GET HUB BY SLUG (NEW - direct slug lookup)
+      if (action === 'getHubBySlug') {
+        const slug = queryStringParameters?.slug;
+        if (!slug) {
+          return {
+            statusCode: 400,
+            body: JSON.stringify({ success: false, error: 'Missing slug' })
+          };
+        }
+
+        const { data: hubs, error } = await supabase
+          .from('Hub_Configs')
+          .select('*')
+          .eq('slug', slug)
           .limit(1);
         
         if (error) throw error;
@@ -174,7 +220,7 @@ exports.handler = async (event) => {
         };
       }
 
-      // CREATE ORDER - UPDATED WITH POPIA CONSENT LOGGING
+      // CREATE ORDER - WITH POPIA CONSENT LOGGING
       if (data.action === 'order') {
         // Get IP address from headers
         const ipAddress = headers['x-forwarded-for'] || headers['client-ip'] || 'unknown';
@@ -214,7 +260,7 @@ exports.handler = async (event) => {
           console.error('Messages insert error:', messagesError);
         }
 
-        // 2. Insert into Consent_Logs table (NEW for POPIA)
+        // 2. Insert into Consent_Logs table (POPIA compliance)
         const { error: consentError } = await supabase
           .from('Consent_Logs')
           .insert([{
@@ -228,13 +274,12 @@ exports.handler = async (event) => {
             Consent_Timestamp: data.consentTimestamp || getSATimestamp(),
             IP_Address: ipAddress,
             User_Agent: userAgent,
-            Wasender_Message_ID: null, // Will be updated later when WasenderAPI is integrated
+            Wasender_Message_ID: null,
             Forwarded_To_Store: false
           }]);
 
         if (consentError) {
           console.error('Consent_Logs insert error:', consentError);
-          // Don't fail the order if consent logging fails, but log it
         }
 
         return { 

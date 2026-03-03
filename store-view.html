@@ -360,13 +360,26 @@
     let path = window.location.pathname;
     let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    const backButton = document.getElementById('back-btn');
+   const backButton = document.getElementById('back-btn');
 
-    if (from === 'hub' && township) {
-      backButton.href = `hub.html?township=${township}`;
+// Check if we have hub info in URL
+const urlParams = new URLSearchParams(window.location.search);
+const from = urlParams.get('from');
+const township = urlParams.get('township');
+
+if (from === 'hub' && township) {
+  backButton.href = `hub.html?township=${township}`;
+} else {
+  // Make it go back in history instead of always to index
+  backButton.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (document.referrer && document.referrer.includes(window.location.host)) {
+      window.history.back();
     } else {
-      backButton.href = 'index.html';
+      window.location.href = 'index.html';
     }
+  });
+}
 
     try {
       // Load all stores
