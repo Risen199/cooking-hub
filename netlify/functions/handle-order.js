@@ -22,7 +22,7 @@ const getSATimestamp = () => {
 };
 
 exports.handler = async (event) => {
-  const { httpMethod, queryStringParameters, body } = event;
+  const { httpMethod, queryStringParameters, body, headers } = event;
 
   try {
     // GET REQUESTS
@@ -174,10 +174,16 @@ exports.handler = async (event) => {
         };
       }
 
-      // CREATE ORDER     
+      // CREATE ORDER - UPDATED WITH POPIA CONSENT LOGGING
       if (data.action === 'order') {
+        // Get IP address from headers
+        const ipAddress = headers['x-forwarded-for'] || headers['client-ip'] || 'unknown';
+        const userAgent = headers['user-agent'] || 'unknown';
+        
         const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
-        const orderMessage = `ORDER FOR: ${data.Customer_Name || 'Customer'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
+        
+        // Format order message with Store ID for WasenderAPI
+        const orderMessage = `[${data.Store_ID}] ORDER FOR: ${data.Customer_Name || 'Customer'}\nPhone: ${data.Customer_Phone || 'Not provided'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
         const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
         const totalAmount = Number(data.Total_Amount) || 0;
@@ -185,7 +191,8 @@ exports.handler = async (event) => {
         const promoterCommission = Number((commissionPool * 0.3).toFixed(2));
         const companyCommission = Number((commissionPool * 0.7).toFixed(2));
 
-        const { error } = await supabase
+        // 1. Insert into Messages table (existing functionality)
+        const { error: messagesError } = await supabase
           .from('Messages')
           .insert([{
             Message_ID: 'msg_' + Date.now(),
@@ -203,8 +210,31 @@ exports.handler = async (event) => {
             Source: 'Website'
           }]);
 
-        if (error) {
-          console.error('Messages insert error:', error);
+        if (messagesError) {
+          console.error('Messages insert error:', messagesError);
+        }
+
+        // 2. Insert into Consent_Logs table (NEW for POPIA)
+        const { error: consentError } = await supabase
+          .from('Consent_Logs')
+          .insert([{
+            Customer_Name: data.Customer_Name || 'Customer',
+            Customer_Phone: data.Customer_Phone || 'Not provided',
+            Store_ID: data.Store_ID || 'unknown',
+            Order_Items: data.Order_Items || 'No items',
+            Total_Amount: totalAmount,
+            Pickup_Window: data.Pickup_Window || 'ASAP',
+            Consent_Given: data.consentGiven || true,
+            Consent_Timestamp: data.consentTimestamp || getSATimestamp(),
+            IP_Address: ipAddress,
+            User_Agent: userAgent,
+            Wasender_Message_ID: null, // Will be updated later when WasenderAPI is integrated
+            Forwarded_To_Store: false
+          }]);
+
+        if (consentError) {
+          console.error('Consent_Logs insert error:', consentError);
+          // Don't fail the order if consent logging fails, but log it
         }
 
         return { 
@@ -213,7 +243,7 @@ exports.handler = async (event) => {
           body: JSON.stringify({ 
             success: true, 
             whatsAppUrl,
-            message: 'Order sent to WhatsApp' 
+            message: 'Order sent to WhatsApp and consent logged' 
           }) 
         };
       }

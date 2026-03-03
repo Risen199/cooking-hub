@@ -173,6 +173,17 @@
       font-size: 0.875rem;
       text-decoration: none;
     }
+    /* POPIA consent styles */
+    .consent-text {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 8px;
+      text-align: left;
+    }
+    .form-check-label a {
+      color: var(--brand-red);
+      text-decoration: none;
+    }
   </style>
 </head>
 <body data-wa-number="27726515909">
@@ -603,26 +614,68 @@
               const selectedTime = btn.dataset.time;
               modal.innerHTML = `
                 <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
-                  <h4 class="mb-3">What's your name Chomie!!</h4>
-                  <p class="text-muted mb-3">We'll put this on your order (e.g., "Blessing")</p>
-                  <input type="text" id="customer-name" class="form-control mb-3" placeholder="First name only" maxlength="20">
+                  <h4 class="mb-3">Complete Your Order</h4>
+                  
+                  <!-- Name field -->
+                  <p class="text-muted mb-1">Your name</p>
+                  <input type="text" id="customer-name" class="form-control mb-3" placeholder="e.g., Blessing" maxlength="20">
+                  
+                  <!-- NEW: Phone number field (for POPIA and WasenderAPI) -->
+                  <p class="text-muted mb-1">WhatsApp number <span class="text-danger">*</span></p>
+                  <input type="tel" id="customer-phone" class="form-control mb-2" placeholder="e.g., 0723456789" maxlength="15">
+                  <small class="text-muted d-block mb-3">So the kitchen can confirm your order</small>
+                  
+                  <!-- NEW: POPIA Consent Checkbox -->
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="consent-checkbox">
+                    <label class="form-check-label" for="consent-checkbox">
+                      I agree that BEIJU may process my name and WhatsApp number to confirm this order. 
+                      My information will not be shared with anyone else.
+                    </label>
+                  </div>
+                  
                   <button class="btn btn-success w-100 mb-2 py-3" id="confirm-name">Confirm & Send Order</button>
                   <button class="btn btn-secondary w-100 py-2" id="back-to-time">← Back to Time</button>
                 </div>
               `;
+              
               document.getElementById('back-to-time').addEventListener('click', () => {
                 document.body.removeChild(modal);
                 document.getElementById('checkout-btn').click();
               });
+              
               document.getElementById('confirm-name').addEventListener('click', () => {
                 const name = document.getElementById('customer-name').value.trim();
+                const phone = document.getElementById('customer-phone').value.trim();
+                const consent = document.getElementById('consent-checkbox').checked;
+                
                 if (!name) {
                   alert("Please enter your name.");
+                  return;
+                }
+                
+                if (!phone) {
+                  alert("Please enter your WhatsApp number so the kitchen can confirm your order.");
+                  return;
+                }
+                
+                // Basic SA phone validation (allows 0723456789 or +27723456789)
+                const cleanPhone = phone.replace(/\D/g, '');
+                if (cleanPhone.length < 10 || cleanPhone.length > 12) {
+                  alert("Please enter a valid South African WhatsApp number (e.g., 0723456789)");
+                  return;
+                }
+                
+                if (!consent) {
+                  alert("Please agree to the terms to continue.");
                   return;
                 }
 
                 const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
                 const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+                
+                // Format phone to international for WasenderAPI
+                const internationalPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
 
                 fetch(API_URL, {
                   method: 'POST',
@@ -631,30 +684,37 @@
                     action: 'order',
                     Store_ID: store.Store_ID,
                     Customer_Name: name,
+                    Customer_Phone: internationalPhone, // NEW: Send phone for POPIA
                     Order_Items: lines.join('|'),
                     Total_Amount: total,
                     Pickup_Window: selectedTime,
                     Delivery_Type: 'Collection',
-                    waNumber: document.body.dataset.waNumber
+                    waNumber: document.body.dataset.waNumber,
+                    // NEW: POPIA consent data
+                    consentGiven: true,
+                    consentTimestamp: new Date().toISOString()
                   })
                 })
                 .then(res => res.json())
                 .then(data => {
                   if (data.success && data.whatsAppUrl) {
+                    // Store ID is embedded in the message for WasenderAPI later
                     window.open(data.whatsAppUrl, '_blank');
                     cart = [];
                     window.cart = cart;
                     updateCartUI();
                   } else {
                     alert("Order logging failed. Opening WhatsApp anyway...");
-                    const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
+                    // Include store ID in fallback message for WasenderAPI
+                    const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                     const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                   }
                 })
                 .catch(err => {
                   console.warn("Logging failed:", err);
-                  const msg = `ORDER FOR: ${name}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
+                  // Include store ID in fallback message for WasenderAPI
+                  const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                   const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                   window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
                 });
@@ -679,5 +739,5 @@
     }
   });
 </script>
-</body>
+</body> 
 </html>
