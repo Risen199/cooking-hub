@@ -367,9 +367,29 @@
     
     try {
       // Load all stores
-      const storeRes = await fetch(`${API_URL}?action=stores`);
-      const storeData = await storeRes.json();
-      if (!storeData.success) throw new Error('Failed to load stores');
+console.log('🔍 Fetching stores from:', `${API_URL}?action=stores`);
+const storeRes = await fetch(`${API_URL}?action=stores`);
+const storeData = await storeRes.json();
+console.log('📦 Store data received:', storeData);
+
+if (!storeData.success) {
+  console.error('❌ Failed to load stores:', storeData);
+  throw new Error('Failed to load stores');
+}
+
+if (!storeData.stores || storeData.stores.length === 0) {
+  console.error('❌ No stores found in response');
+  document.getElementById('store-name').textContent = 'No stores available';
+  document.getElementById('menu-container').innerHTML = `
+    <div class="col-12 text-center py-5">
+      <p class="text-danger">No stores found. Please try again later.</p>
+      <a href="index.html" class="btn btn-outline-primary mt-3">Back to Home</a>
+    </div>
+  `;
+  return;
+}
+
+console.log('✅ Stores loaded successfully, total stores:', storeData.stores.length);
 
       // Try to find store by clean slug first, then by storeId
       let store = null;
