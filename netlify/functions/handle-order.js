@@ -261,22 +261,22 @@ exports.handler = async (event) => {
         }
 
         // 2. Insert into Consent_Logs table (POPIA compliance)
-        const { error: consentError } = await supabase
-          .from('consent_logs')
-          .insert([{
-            Customer_Name: data.Customer_Name || 'Customer',
-            Customer_Phone: data.Customer_Phone || 'Not provided',
-            Store_ID: data.Store_ID || 'unknown',
-            Order_Items: data.Order_Items || 'No items',
-            Total_Amount: totalAmount,
-            Pickup_Window: data.Pickup_Window || 'ASAP',
-            Consent_Given: data.consentGiven || true,
-            Consent_Timestamp: data.consentTimestamp || getSATimestamp(),
-            IP_Address: ipAddress,
-            User_Agent: userAgent,
-            Wasender_Message_ID: null,
-            Forwarded_To_Store: false
-          }]);
+      const { error: consentError } = await supabase
+        .from('consent_logs')
+        .insert([{
+          customer_name: data.Customer_Name || 'Customer',              // ← changed
+          customer_phone: data.Customer_Phone || 'Not provided',        // ← changed
+          store_id: data.Store_ID || 'unknown',                         // ← changed
+          order_items: data.Order_Items || 'No items',                  // ← changed
+          total_amount: totalAmount,                                     // ← changed
+          pickup_window: data.Pickup_Window || 'ASAP',                  // ← changed
+          consent_given: data.consentGiven || true,                     // ← changed
+          consent_timestamp: data.consentTimestamp || getSATimestamp(), // ← changed
+          ip_address: ipAddress,                                         // ← changed
+          user_agent: userAgent,                                         // ← changed
+          wasender_message_id: null,                                     // ← changed
+          forwarded_to_store: false                                      // ← changed
+        }]);
 
         if (consentError) {
           console.error('consent_logs insert error:', consentError);
