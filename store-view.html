@@ -173,7 +173,18 @@
       font-size: 0.875rem;
       text-decoration: none;
     }
-</style>
+    /* POPIA consent styles */
+    .consent-text {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 8px;
+      text-align: left;
+    }
+    .form-check-label a {
+      color: var(--brand-red);
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body data-wa-number="27726515909">
 
@@ -204,15 +215,15 @@
   <nav class="navbar navbar-expand-lg sticky-top shadow-sm">
     <div class="container">
       <a class="navbar-brand" href="index.html">BE<span class="brand-red">IJU</span></a>
-      <a class="btn btn-outline-dark fw-bold" id="back-btn" href="javascript:void(0);" onclick="handleBackButton()">← Back</a>
+      <a class="btn btn-outline-dark fw-bold" id="back-btn" href="javascript:void(0);" onclick="goBack()">← Back</a>
     </div>
   </nav>
 
   <script>
-    function handleBackButton() {
-      const params = new URLSearchParams(window.location.search);
-      const from = params.get('from');
-      const township = params.get('township');
+    function goBack() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const from = urlParams.get('from');
+      const township = urlParams.get('township');
       
       if (from === 'hub' && township) {
         window.location.href = `hub.html?township=${township}`;
@@ -355,43 +366,25 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    // Get storeId from URL params
-    const params = new URLSearchParams(window.location.search);
+    // Get storeId from URL params (old way)
+    const urlParams = new URLSearchParams(window.location.search);
     const storeId = urlParams.get('storeId');
     const from = urlParams.get('from');
     const township = urlParams.get('township');
     
-    // Get clean slug from URL path
+    // Get clean slug from URL path (new way)
     let path = window.location.pathname;
     let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
     try {
       // Load all stores
-console.log('🔍 Fetching stores from:', `${API_URL}?action=stores`);
-const storeRes = await fetch(`${API_URL}?action=stores`);
-const storeData = await storeRes.json();
-console.log('📦 Store data received:', storeData);
+      const storeRes = await fetch(`${API_URL}?action=stores`);
+      const storeData = await storeRes.json();
+      if (!storeData.success) throw new Error('Failed to load stores');
 
-if (!storeData.success) {
-  console.error('❌ Failed to load stores:', storeData);
-  throw new Error('Failed to load stores');
-}
-
-if (!storeData.stores || storeData.stores.length === 0) {
-  console.error('❌ No stores found in response');
-  document.getElementById('store-name').textContent = 'No stores available';
-  document.getElementById('menu-container').innerHTML = `
-    <div class="col-12 text-center py-5">
-      <p class="text-danger">No stores found. Please try again later.</p>
-      <a href="index.html" class="btn btn-outline-primary mt-3">Back to Home</a>
-    </div>
-  `;
-  return;
-}
-
-console.log('✅ Stores loaded successfully, total stores:', storeData.stores.length);
-
-      // Try to find store by clean slug first, then by storeId
+      // Try to find store by:
+      // 1. Clean slug first (new way)
+      // 2. Store ID second (old way)
       let store = null;
       
       if (cleanSlug && cleanSlug !== 'store-view.html' && cleanSlug !== 'hub.html' && cleanSlug !== '') {
@@ -635,12 +628,12 @@ console.log('✅ Stores loaded successfully, total stores:', storeData.stores.le
                   <p class="text-muted mb-1">Your name</p>
                   <input type="text" id="customer-name" class="form-control mb-3" placeholder="e.g., Blessing" maxlength="20">
                   
-                  <!-- Phone number field -->
+                  <!-- NEW: Phone number field (for POPIA and WasenderAPI) -->
                   <p class="text-muted mb-1">WhatsApp number <span class="text-danger">*</span></p>
                   <input type="tel" id="customer-phone" class="form-control mb-2" placeholder="e.g., 0723456789" maxlength="15">
                   <small class="text-muted d-block mb-3">So the kitchen can confirm your order</small>
                   
-                  <!-- POPIA Consent Checkbox -->
+                  <!-- NEW: POPIA Consent Checkbox -->
                   <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="consent-checkbox">
                     <label class="form-check-label" for="consent-checkbox">
@@ -674,7 +667,7 @@ console.log('✅ Stores loaded successfully, total stores:', storeData.stores.le
                   return;
                 }
                 
-                // Basic SA phone validation
+                // Basic SA phone validation (allows 0723456789 or +27723456789)
                 const cleanPhone = phone.replace(/\D/g, '');
                 if (cleanPhone.length < 10 || cleanPhone.length > 12) {
                   alert("Please enter a valid South African WhatsApp number (e.g., 0723456789)");
@@ -689,7 +682,7 @@ console.log('✅ Stores loaded successfully, total stores:', storeData.stores.le
                 const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
                 const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
                 
-                // Format phone to international
+                // Format phone to international for WasenderAPI
                 const internationalPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
 
                 fetch(API_URL, {
@@ -699,12 +692,13 @@ console.log('✅ Stores loaded successfully, total stores:', storeData.stores.le
                     action: 'order',
                     Store_ID: store.Store_ID,
                     Customer_Name: name,
-                    Customer_Phone: internationalPhone,
+                    Customer_Phone: internationalPhone, // NEW: Send phone for POPIA
                     Order_Items: lines.join('|'),
                     Total_Amount: total,
                     Pickup_Window: selectedTime,
                     Delivery_Type: 'Collection',
                     waNumber: document.body.dataset.waNumber,
+                    // NEW: POPIA consent data
                     consentGiven: true,
                     consentTimestamp: new Date().toISOString()
                   })
@@ -712,12 +706,14 @@ console.log('✅ Stores loaded successfully, total stores:', storeData.stores.le
                 .then(res => res.json())
                 .then(data => {
                   if (data.success && data.whatsAppUrl) {
+                    // Store ID is embedded in the message for WasenderAPI later
                     window.open(data.whatsAppUrl, '_blank');
                     cart = [];
                     window.cart = cart;
                     updateCartUI();
                   } else {
                     alert("Order logging failed. Opening WhatsApp anyway...");
+                    // Include store ID in fallback message for WasenderAPI
                     const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                     const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -725,6 +721,7 @@ console.log('✅ Stores loaded successfully, total stores:', storeData.stores.le
                 })
                 .catch(err => {
                   console.warn("Logging failed:", err);
+                  // Include store ID in fallback message for WasenderAPI
                   const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                   const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                   window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
