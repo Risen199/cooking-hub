@@ -279,7 +279,7 @@ exports.handler = async (event) => {
           }]);
 
         if (consentError) {
-          console.error('Consent_Logs insert error:', consentError);
+          console.error('consent_logs insert error:', consentError);
         }
 
         return { 
