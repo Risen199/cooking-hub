@@ -262,7 +262,7 @@ exports.handler = async (event) => {
 
         // 2. Insert into Consent_Logs table (POPIA compliance)
         const { error: consentError } = await supabase
-          .from('Consent_Logs')
+          .from('consent_Logs')
           .insert([{
             Customer_Name: data.Customer_Name || 'Customer',
             Customer_Phone: data.Customer_Phone || 'Not provided',
