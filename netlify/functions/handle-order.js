@@ -24,7 +24,9 @@ const getSATimestamp = () => {
 // WasenderAPI function to send WhatsApp messages
 async function sendWasenderMessage(to, text) {
   try {
-    const response = await fetch('https://api.wasender.com/v1/messages/send', {
+    console.log('📤 Sending to Wasender:', { to, text });
+    
+    const response = await fetch('https://www.wasenderapi.com/api/send-message', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.WASENDER_API_KEY}`,
@@ -37,9 +39,10 @@ async function sendWasenderMessage(to, text) {
     });
     
     const data = await response.json();
-    return { success: true, data };
+    console.log('📥 WasenderAPI response:', data);
+    return { success: response.ok, data };
   } catch (error) {
-    console.error('WasenderAPI send error:', error);
+    console.error('❌ WasenderAPI send error:', error);
     return { success: false, error };
   }
 }
@@ -317,9 +320,6 @@ exports.handler = async (event) => {
         
         // Format order message with Store ID for WasenderAPI
         const orderMessage = `[${data.Store_ID}] ORDER FOR: ${data.Customer_Name || 'Customer'}\nPhone: ${data.Customer_Phone || 'Not provided'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
-        
-        // Don't create WhatsApp link anymore - we'll use WasenderAPI
-        // const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
         const totalAmount = Number(data.Total_Amount) || 0;
         const commissionPool = Number((totalAmount * 0.15).toFixed(2));
@@ -371,7 +371,7 @@ exports.handler = async (event) => {
           console.error('consent_logs insert error:', consentError);
         }
 
-        // 3. Send via WasenderAPI to central number (which then forwards)
+        // 3. Send via WasenderAPI to central number
         const wasenderResult = await sendWasenderMessage(waNumber, orderMessage);
         
         // 4. Send auto-response to customer
@@ -386,13 +386,13 @@ exports.handler = async (event) => {
         // 5. Forward to store silently
         await forwardOrderToStore(data.Store_ID, orderMessage, data.Customer_Phone);
 
+        // 6. Return success (no WhatsApp link needed anymore)
         return { 
           statusCode: 200,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            success: true, 
-            // whatsAppUrl: wasenderResult.success ? null : `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`,
-            message: 'Order processed with WasenderAPI' 
+            success: true,
+            message: 'Order processed with WasenderAPI'
           }) 
         };
       }
