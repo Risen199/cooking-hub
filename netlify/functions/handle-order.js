@@ -21,6 +21,93 @@ const getSATimestamp = () => {
   }).replace(/[/]/g, '-').replace(/, /g, ' ');
 };
 
+// WasenderAPI function to send WhatsApp messages
+async function sendWasenderMessage(to, text) {
+  try {
+    const response = await fetch('https://api.wasender.com/v1/messages/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.WASENDER_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        to: to,
+        text: text
+      })
+    });
+    
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error) {
+    console.error('WasenderAPI send error:', error);
+    return { success: false, error };
+  }
+}
+
+// Function to send auto-response to customer
+async function sendCustomerAutoResponse(customerPhone, storeId, orderDetails) {
+  try {
+    // Get store response templates
+    const { data: response } = await supabase
+      .from('store_responses')
+      .select('*')
+      .eq('store_id', storeId)
+      .single();
+
+    // Get store details
+    const { data: store } = await supabase
+      .from('Stores')
+      .select('Name')
+      .eq('Store_ID', storeId)
+      .single();
+
+    if (response) {
+      const message = `${response.auto_response}\n\n📍 ${response.location_details || 'Ask store for location'}\n⏰ ${orderDetails.pickup_window}\n\n${response.thank_you_message || 'Thank you for ordering!'}`;
+      
+      await sendWasenderMessage(customerPhone, message);
+      
+      // Log to wasender_logs
+      await supabase.from('wasender_logs').insert([{
+        customer_phone: customerPhone,
+        store_id: storeId,
+        message_type: 'auto_response',
+        message_content: message,
+        status: 'sent'
+      }]);
+    }
+  } catch (error) {
+    console.error('Auto-response error:', error);
+  }
+}
+
+// Function to forward order to store
+async function forwardOrderToStore(storeId, orderMessage, customerPhone) {
+  try {
+    // Get store's real WhatsApp number
+    const { data: store } = await supabase
+      .from('store_whatsapp')
+      .select('real_whatsapp')
+      .eq('store_id', storeId)
+      .single();
+
+    if (store) {
+      const message = `🛍️ NEW ORDER\n${orderMessage}\n\nCustomer: ${customerPhone}`;
+      await sendWasenderMessage(store.real_whatsapp, message);
+      
+      // Log to wasender_logs
+      await supabase.from('wasender_logs').insert([{
+        customer_phone: customerPhone,
+        store_id: storeId,
+        message_type: 'forward_to_store',
+        message_content: message,
+        status: 'sent'
+      }]);
+    }
+  } catch (error) {
+    console.error('Forward to store error:', error);
+  }
+}
+
 exports.handler = async (event) => {
   const { httpMethod, queryStringParameters, body, headers } = event;
 
@@ -148,7 +235,7 @@ exports.handler = async (event) => {
         }
       }
 
-      // 5. GET ALL HUBS (NEW - for slug lookup)
+      // 5. GET ALL HUBS
       if (action === 'getAllHubs') {
         const { data: hubs, error } = await supabase
           .from('Hub_Configs')
@@ -163,7 +250,7 @@ exports.handler = async (event) => {
         };
       }
 
-      // 6. GET HUB BY SLUG (NEW - direct slug lookup)
+      // 6. GET HUB BY SLUG
       if (action === 'getHubBySlug') {
         const slug = queryStringParameters?.slug;
         if (!slug) {
@@ -220,24 +307,26 @@ exports.handler = async (event) => {
         };
       }
 
-      // CREATE ORDER - WITH POPIA CONSENT LOGGING
+      // CREATE ORDER - WITH POPIA AND WASENDERAPI INTEGRATION
       if (data.action === 'order') {
         // Get IP address from headers
         const ipAddress = headers['x-forwarded-for'] || headers['client-ip'] || 'unknown';
         const userAgent = headers['user-agent'] || 'unknown';
         
-        const waNumber = (data.waNumber || '27726515909').replace(/\D/g, '');
+        const waNumber = (data.waNumber || '27638716816').replace(/\D/g, ''); // Your central number
         
         // Format order message with Store ID for WasenderAPI
         const orderMessage = `[${data.Store_ID}] ORDER FOR: ${data.Customer_Name || 'Customer'}\nPhone: ${data.Customer_Phone || 'Not provided'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
-        const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
+        
+        // Don't create WhatsApp link anymore - we'll use WasenderAPI
+        // const whatsAppUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`;
 
         const totalAmount = Number(data.Total_Amount) || 0;
         const commissionPool = Number((totalAmount * 0.15).toFixed(2));
         const promoterCommission = Number((commissionPool * 0.3).toFixed(2));
         const companyCommission = Number((commissionPool * 0.7).toFixed(2));
 
-        // 1. Insert into Messages table (existing functionality)
+        // 1. Insert into Messages table
         const { error: messagesError } = await supabase
           .from('Messages')
           .insert([{
@@ -260,35 +349,50 @@ exports.handler = async (event) => {
           console.error('Messages insert error:', messagesError);
         }
 
-        // 2. Insert into Consent_Logs table (POPIA compliance)
-      const { error: consentError } = await supabase
-        .from('consent_logs')
-        .insert([{
-          customer_name: data.Customer_Name || 'Customer',              // ← changed
-          customer_phone: data.Customer_Phone || 'Not provided',        // ← changed
-          store_id: data.Store_ID || 'unknown',                         // ← changed
-          order_items: data.Order_Items || 'No items',                  // ← changed
-          total_amount: totalAmount,                                     // ← changed
-          pickup_window: data.Pickup_Window || 'ASAP',                  // ← changed
-          consent_given: data.consentGiven || true,                     // ← changed
-          consent_timestamp: data.consentTimestamp || getSATimestamp(), // ← changed
-          ip_address: ipAddress,                                         // ← changed
-          user_agent: userAgent,                                         // ← changed
-          wasender_message_id: null,                                     // ← changed
-          forwarded_to_store: false                                      // ← changed
-        }]);
+        // 2. Insert into Consent_Logs table
+        const { error: consentError } = await supabase
+          .from('consent_logs')
+          .insert([{
+            customer_name: data.Customer_Name || 'Customer',
+            customer_phone: data.Customer_Phone || 'Not provided',
+            store_id: data.Store_ID || 'unknown',
+            order_items: data.Order_Items || 'No items',
+            total_amount: totalAmount,
+            pickup_window: data.Pickup_Window || 'ASAP',
+            consent_given: data.consentGiven || true,
+            consent_timestamp: data.consentTimestamp || getSATimestamp(),
+            ip_address: ipAddress,
+            user_agent: userAgent,
+            wasender_message_id: null,
+            forwarded_to_store: false
+          }]);
 
         if (consentError) {
           console.error('consent_logs insert error:', consentError);
         }
+
+        // 3. Send via WasenderAPI to central number (which then forwards)
+        const wasenderResult = await sendWasenderMessage(waNumber, orderMessage);
+        
+        // 4. Send auto-response to customer
+        if (data.Customer_Phone && data.Customer_Phone !== 'Not provided') {
+          await sendCustomerAutoResponse(
+            data.Customer_Phone, 
+            data.Store_ID,
+            { pickup_window: data.Pickup_Window || 'ASAP' }
+          );
+        }
+
+        // 5. Forward to store silently
+        await forwardOrderToStore(data.Store_ID, orderMessage, data.Customer_Phone);
 
         return { 
           statusCode: 200,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             success: true, 
-            whatsAppUrl,
-            message: 'Order sent to WhatsApp and consent logged' 
+            // whatsAppUrl: wasenderResult.success ? null : `https://wa.me/${waNumber}?text=${encodeURIComponent(orderMessage)}`,
+            message: 'Order processed with WasenderAPI' 
           }) 
         };
       }
