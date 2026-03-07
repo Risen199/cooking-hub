@@ -133,7 +133,7 @@
         </div>
       </div>
       <div id="stores-container" class="row g-4">
-      <div class="col-12 text-center py-5">
+        <div class="col-12 text-center py-5">
           <div class="loading-spinner"></div>
           <p class="mt-3 text-muted">Loading kitchens...</p>
         </div>
@@ -165,17 +165,16 @@
 <script>
   const API_URL = '/.netlify/functions/handle-order';
 
-  // Get parameters from URL - supports BOTH clean URLs and query params
-  const urlParams = new URLSearchParams(window.location.search);
-  let townshipCode = urlParams.get('township');
-  let hubSlug = urlParams.get('slug');
+  // Get parameters from URL
+  const params = new URLSearchParams(window.location.search);
+  let townshipCode = params.get('township');
+  let hubSlug = params.get('slug');
   
-  // Extract slug from clean URL path (e.g., /blouberg → hub.html)
+  // Extract slug from clean URL path
   if (!townshipCode && !hubSlug) {
     let path = window.location.pathname;
     let possibleSlug = path.replace(/^\//, '').replace(/\/$/, '');
     
-    // Exclude known static files
     if (possibleSlug && 
         possibleSlug !== 'hub.html' && 
         possibleSlug !== 'index.html' && 
@@ -188,17 +187,14 @@
     }
   }
 
-  console.log('🔍 Looking for hub with:', { townshipCode, hubSlug });
+  console.log('🔍 Looking for hub:', { townshipCode, hubSlug });
 
-  // Main initialization
   async function initializePage() {
     if (!townshipCode && !hubSlug) {
-      console.error('No hub identifier found');
       document.getElementById('township-name').textContent = 'Hub not found';
       document.getElementById('stores-container').innerHTML = `
         <div class="col-12 text-center py-5">
           <h3 class="text-muted">No hub specified</h3>
-          <p class="text-muted">Please select a township from the homepage.</p>
           <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
         </div>
       `;
@@ -207,54 +203,36 @@
 
     try {
       let hubData = null;
+      let foundTownshipCode = townshipCode;
       
-      // PRIORITY 1: Try slug first (clean URLs like /blouberg)
       if (hubSlug) {
-        console.log('🔍 Trying to find hub by slug:', hubSlug);
-        
-        // Try direct slug lookup first
+        console.log('🔍 Fetching hub by slug:', hubSlug);
         const hubRes = await fetch(`${API_URL}?action=getHubBySlug&slug=${encodeURIComponent(hubSlug)}`);
         const hubDataResponse = await hubRes.json();
         
         if (hubDataResponse.success && hubDataResponse.hub) {
           hubData = hubDataResponse.hub;
-          townshipCode = hubData.Township_Code;
+          foundTownshipCode = hubData.Township_Code;
           console.log('✅ Found hub by slug:', hubData.Hub_Name);
-        } else {
-          // Fallback: try getAllHubs and find by slug manually
-          console.log('⚠️ Direct slug lookup failed, trying getAllHubs');
-          const allHubsRes = await fetch(`${API_URL}?action=getAllHubs`);
-          const allHubsData = await allHubsRes.json();
-          
-          if (allHubsData.success && allHubsData.hubs) {
-            hubData = allHubsData.hubs.find(h => h.slug === hubSlug);
-            if (hubData) {
-              townshipCode = hubData.Township_Code;
-              console.log('✅ Found hub by slug in getAllHubs:', hubData.Hub_Name);
-            }
-          }
         }
       }
       
-      // PRIORITY 2: Fallback to township code (old URLs like ?township=BLB)
       if (!hubData && townshipCode) {
-        console.log('🔍 Trying by township code:', townshipCode);
+        console.log('🔍 Fetching hub by township code:', townshipCode);
         const hubRes = await fetch(`${API_URL}?action=getHub&township=${encodeURIComponent(townshipCode)}`);
         const hubDataResponse = await hubRes.json();
         
         if (hubDataResponse.success && hubDataResponse.hub) {
           hubData = hubDataResponse.hub;
-          console.log('✅ Found by township code:', hubData.Hub_Name);
+          console.log('✅ Found hub by township code:', hubData.Hub_Name);
         }
       }
 
       if (!hubData) {
-        console.error('No hub found');
         document.getElementById('township-name').textContent = 'Hub not found';
         document.getElementById('stores-container').innerHTML = `
           <div class="col-12 text-center py-5">
-            <h3 class="text-muted">Hub not found</h3>
-            <p class="text-muted">This township is not available yet.</p>
+            <h3 class="text-muted">Hub not available</h3>
             <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
           </div>
         `;
@@ -264,96 +242,61 @@
       // Update page with hub data
       document.getElementById('township-name').textContent = hubData.Hub_Name || 'Township';
       document.getElementById('footer-township').textContent = (hubData.Hub_Name || 'TOWNSHIP').toUpperCase();
-      document.getElementById('store-count-text').textContent = hubData.StoreCountText || 'Legendary Kitchens';
       document.title = `${hubData.Hub_Name || 'Township'} — BEIJU`;
       
-      // Apply brand color if available
       if (hubData.Brand_Color) {
         document.documentElement.style.setProperty('--brand-red', hubData.Brand_Color);
       }
       
-      // Apply hero background image
       const heroSection = document.getElementById('hero-section');
       if (hubData.Hero_Image_URL) {
         heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('${hubData.Hero_Image_URL}')`;
-        heroSection.style.backgroundSize = 'cover';
-        heroSection.style.backgroundPosition = 'center';
       }
       
-      // Update hero slogan
       const heroTitle = document.querySelector('.hero-home .display-2');
       if (hubData.Slogan) {
         heroTitle.innerHTML = `${hubData.Slogan} <span class="brand-red">${hubData.Hub_Name}</span>`;
-      } else {
-        heroTitle.innerHTML = `The Flavours of <span class="brand-red">${hubData.Hub_Name}</span>`;
       }
 
-      // Load stores for this township
-      await loadStores(townshipCode);
+      await loadStores(foundTownshipCode);
 
     } catch (error) {
-      console.error('Error initializing page:', error);
-      document.getElementById('stores-container').innerHTML = `
-        <div class="col-12 text-center py-5">
-          <h3 class="text-danger">Error loading hub</h3>
-          <p class="text-muted">${error.message}</p>
-          <a href="index.html" class="btn btn-dark mt-3">Back to Home</a>
-        </div>
-      `;
+      console.error('Error:', error);
     }
   }
 
-  // Fetch and display stores for this hub
-  async function loadStores(townshipCode) {
+  async function loadStores(code) {
     try {
-      const response = await fetch(`${API_URL}?action=stores&township=${encodeURIComponent(townshipCode)}`);
+      const response = await fetch(`${API_URL}?action=stores&township=${encodeURIComponent(code)}`);
       const data = await response.json();
 
       if (!data.success || !data.stores || data.stores.length === 0) {
         document.getElementById('stores-container').innerHTML = `
           <div class="col-12 text-center py-5">
             <h3 class="text-muted">No kitchens found</h3>
-            <p class="text-muted">Check back soon for new partners!</p>
           </div>
         `;
         document.getElementById('store-count').textContent = '0';
         return;
       }
 
-      const stores = data.stores;
-      document.getElementById('store-count').textContent = stores.length;
+      document.getElementById('store-count').textContent = data.stores.length;
 
-      // Build store cards with clean URLs
-      const storesHTML = stores.map(store => {
-        let statusBadge = '';
-        if (store.Temporarily_Closed && store.Status_Message) {
-          statusBadge = `<span class="badge bg-danger position-absolute" style="top:40px; left:10px; z-index:10;">${store.Status_Message}</span>`;  
-        } else if (store.Temporarily_Closed) {
-          statusBadge = `<span class="badge bg-warning text-dark position-absolute" style="top:10px; left:10px;">Temporarily Closed</span>`;
-        }
-        
+      const storesHTML = data.stores.map(store => {
         const storeImage = store.Hero_URL || store.Banner_URL || 'assets/images/image.webp';
-        
-        // Use slug for clean URL if available, fallback to storeId with from=hub parameter
-        const storeLink = store.slug ? 
-          `/${store.slug}` : 
-          `store-view.html?storeId=${store.Store_ID}&from=hub&township=${townshipCode}`;
+        const storeLink = store.slug ? `/${store.slug}` : `store-view.html?storeId=${store.Store_ID}&from=hub&township=${code}`;
         
         return `
         <div class="col-6 col-lg-3">
-          <div class="card store-card h-100 shadow-sm border-0 position-relative">
-            ${statusBadge}
-            <span class="category-badge">${store.Category || 'Food'}</span>
+          <div class="card store-card h-100 shadow-sm border-0">
             <img src="${storeImage}" 
                  class="card-img-top" 
                  style="height:160px; object-fit:cover;"
-                 alt="${store.Name}"
-                 onerror="this.src='assets/images/image.webp'">
+                 alt="${store.Name}">
             <div class="card-body p-3">
               <h5 class="fw-bold mb-1">${store.Name}</h5>
               <p class="small text-muted mb-3">${store.Slogan || 'Local Kitchen'}</p>
-              <a href="${storeLink}" 
-                 class="btn btn-dark w-100 rounded-pill">View Menu</a>
+              <a href="${storeLink}" class="btn btn-dark w-100 rounded-pill">View Menu</a>
             </div>
           </div>
         </div>
@@ -364,17 +307,10 @@
 
     } catch (error) {
       console.error('Error loading stores:', error);
-      document.getElementById('stores-container').innerHTML = `
-        <div class="col-12 text-center py-5">
-          <h3 class="text-danger">Failed to load kitchens</h3>
-          <p class="text-muted">${error.message}</p>
-        </div>
-      `;
     }
   }
 
-  // Start the page
   initializePage();
- </script>
+</script>
 </body>
- </html>
+</html>

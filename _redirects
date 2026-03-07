@@ -1,8 +1,8 @@
 # Hub redirects
-/VAL          /hub.html?township=VAL    200
-/BLB     /hub.html?township=BLB    200
+/VAAL          /hub.html?township=VAL    200
+/Blouberg     /hub.html?township=BLB    200
 /bedworthpark /hub.html?township=BDP    200
-/MAN     /hub.html?township=MAN    200
+/Mankweng     /hub.html?township=MAN    200
 /seshego     /hub.html?township=SES    200
 /Vanderbijlpark     /hub.html?township=VDK    200
  
