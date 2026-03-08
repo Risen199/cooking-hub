@@ -31,13 +31,12 @@ function getWeekRange(date = new Date()) {
   const start = new Date(date);
   const end = new Date(date);
   
-  // If today is Saturday or later, last week ended yesterday (Friday)
   if (day >= 6) { // Saturday
-    start.setDate(date.getDate() - day - 1); // Go back to previous Saturday
-    end.setDate(date.getDate() - day); // Previous Friday
+    start.setDate(date.getDate() - day - 1);
+    end.setDate(date.getDate() - day);
   } else {
-    start.setDate(date.getDate() - day - 6); // Go back to Saturday
-    end.setDate(date.getDate() - day); // This Friday
+    start.setDate(date.getDate() - day - 6);
+    end.setDate(date.getDate() - day);
   }
   
   start.setHours(0,0,0,0);
@@ -46,8 +45,22 @@ function getWeekRange(date = new Date()) {
   return { start, end };
 }
 
+// Get month date range
+function getMonthRange(date = new Date()) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  start.setHours(0,0,0,0);
+  end.setHours(23,59,59,999);
+  return { start, end };
+}
+
 // Format currency
 const formatMoney = (amount) => `R${Number(amount).toFixed(2)}`;
+
+// Format date for display
+const formatDate = (date) => {
+  return date.toLocaleDateString('en-ZA', { month: 'short', day: 'numeric' });
+};
 
 // Extract phone number properly from WhatsApp LID format
 function extractPhoneNumber(messageKey) {
@@ -55,100 +68,374 @@ function extractPhoneNumber(messageKey) {
   
   let phoneNumber = null;
   
-  // Method 1: Use senderPn if available (this is the phone number format)
   if (messageKey.senderPn) {
     phoneNumber = messageKey.senderPn.split('@')[0];
-    console.log('✅ Found senderPn:', phoneNumber);
-  }
-  // Method 2: Use cleanedSenderPn if available
-  else if (messageKey.cleanedSenderPn) {
+  } else if (messageKey.cleanedSenderPn) {
     phoneNumber = messageKey.cleanedSenderPn;
-    console.log('✅ Found cleanedSenderPn:', phoneNumber);
-  }
-  // Method 3: Fallback to remoteJid but clean it
-  else {
+  } else {
     let rawNumber = messageKey.remoteJid.split('@')[0];
-    // Remove any non-digits
     phoneNumber = rawNumber.replace(/\D/g, '');
-    console.log('⚠️ Using cleaned remoteJid:', phoneNumber);
   }
   
-  // Ensure it has South African country code (27)
   if (phoneNumber) {
-    // Remove any + or spaces
     phoneNumber = phoneNumber.replace(/\D/g, '');
     
-    // Format for SA numbers
     if (phoneNumber.length === 9) {
       phoneNumber = '27' + phoneNumber;
     } else if (phoneNumber.length === 10 && phoneNumber.startsWith('0')) {
       phoneNumber = '27' + phoneNumber.slice(1);
-    } else if (phoneNumber.length === 11 && phoneNumber.startsWith('27')) {
-      // Already correct format
-    } else if (phoneNumber.length === 12 && phoneNumber.startsWith('27')) {
-      // Already correct format
     }
     
-    // Add + for database lookup
     phoneNumber = '+' + phoneNumber;
   }
   
-  console.log('📱 Final formatted number:', phoneNumber);
   return phoneNumber;
 }
 
+// Show main menu
+async function showMainMenu(phoneNumber, promoter) {
+  // Get all stores for this promoter
+  const { data: stores } = await supabase
+    .from('Stores')
+    .select('Store_ID, Name')
+    .eq('promoter_id', promoter.id);
+  
+  if (!stores || stores.length === 0) {
+    await sendWasenderMessage(phoneNumber,
+      `👋 *${promoter.promoter_name}*\n\nYou have no stores yet. Add some to start earning!`);
+    return;
+  }
+  
+  const storeIds = stores.map(s => s.Store_ID);
+  
+  // Get last week's completed earnings
+  const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
+  const { data: lastWeekOrders } = await supabase
+    .from('Messages')
+    .select('Promoter_Commission')
+    .in('Store_ID', storeIds)
+    .gte('Timestamp', lastWeek.start.toISOString())
+    .lt('Timestamp', lastWeek.end.toISOString());
+  
+  const lastWeekTotal = (lastWeekOrders || []).reduce(
+    (sum, o) => sum + (Number(o.Promoter_Commission) || 0), 0
+  );
+  
+  // Get this week's in-progress earnings
+  const thisWeek = getWeekRange(new Date());
+  const { data: thisWeekOrders } = await supabase
+    .from('Messages')
+    .select('Store_ID, Promoter_Commission')
+    .in('Store_ID', storeIds)
+    .gte('Timestamp', thisWeek.start.toISOString())
+    .lt('Timestamp', thisWeek.end.toISOString());
+  
+  const thisWeekTotal = (thisWeekOrders || []).reduce(
+    (sum, o) => sum + (Number(o.Promoter_Commission) || 0), 0
+  );
+  
+  // Calculate per-store totals for this week (top 2 for preview)
+  const storeTotals = {};
+  stores.forEach(store => { storeTotals[store.Store_ID] = 0; });
+  (thisWeekOrders || []).forEach(order => {
+    storeTotals[order.Store_ID] += Number(order.Promoter_Commission) || 0;
+  });
+  
+  // Sort stores by earnings for preview
+  const sortedStores = [...stores].sort((a, b) => 
+    (storeTotals[b.Store_ID] || 0) - (storeTotals[a.Store_ID] || 0)
+  );
+  
+  let response = `👋 *${promoter.promoter_name}*, your earnings:\n\n`;
+  
+  response += `📆 *Last week* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)}): `;
+  response += `${formatMoney(lastWeekTotal)} ${lastWeekTotal > 0 ? '✅' : ''}\n`;
+  
+  response += `📆 *This week* (${formatDate(thisWeek.start)}-now): `;
+  response += `${formatMoney(thisWeekTotal)} ${thisWeekTotal > 0 ? '⏳' : ''}\n\n`;
+  
+  response += `*Your stores this week:*\n`;
+  sortedStores.slice(0, 3).forEach(store => {
+    const amount = storeTotals[store.Store_ID] || 0;
+    response += `🍳 ${store.Name}: ${formatMoney(amount)}\n`;
+  });
+  
+  if (stores.length > 3) {
+    response += `... and ${stores.length - 3} more stores\n`;
+  }
+  
+  response += `\n📋 *Reply:*\n`;
+  response += `1️⃣ This week details\n`;
+  response += `2️⃣ Last week details\n`;
+  response += `3️⃣ All stores\n`;
+  response += `4️⃣ This month\n`;
+  
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+// Show this week details
+async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
+  const thisWeek = getWeekRange(new Date());
+  
+  const { data: orders } = await supabase
+    .from('Messages')
+    .select('Store_ID, Promoter_Commission')
+    .in('Store_ID', storeIds)
+    .gte('Timestamp', thisWeek.start.toISOString())
+    .lt('Timestamp', thisWeek.end.toISOString());
+  
+  const storeTotals = {};
+  const storeCounts = {};
+  stores.forEach(store => { 
+    storeTotals[store.Store_ID] = 0; 
+    storeCounts[store.Store_ID] = 0;
+  });
+  
+  (orders || []).forEach(order => {
+    storeTotals[order.Store_ID] += Number(order.Promoter_Commission) || 0;
+    storeCounts[order.Store_ID] += 1;
+  });
+  
+  const total = Object.values(storeTotals).reduce((sum, val) => sum + val, 0);
+  
+  if (total === 0) {
+    await sendWasenderMessage(phoneNumber,
+      `📆 *This week* (${formatDate(thisWeek.start)}-now)\n\n` +
+      `No orders yet this week.\n\n` +
+      `Orders start appearing as they come in.\n\n` +
+      `0️⃣ Back to main menu`);
+    return;
+  }
+  
+  // Calculate payout date (Monday after week ends)
+  const payoutDate = new Date(thisWeek.end);
+  payoutDate.setDate(payoutDate.getDate() + 3);
+  
+  let response = `📆 *This week* (${formatDate(thisWeek.start)}-now) - in progress\n\n`;
+  
+  stores.forEach(store => {
+    const amount = storeTotals[store.Store_ID] || 0;
+    const count = storeCounts[store.Store_ID] || 0;
+    if (amount > 0 || count > 0) {
+      response += `🍳 ${store.Name}: ${formatMoney(amount)} (${count} order${count !== 1 ? 's' : ''})\n`;
+    }
+  });
+  
+  // Show stores with zero orders
+  stores.forEach(store => {
+    const amount = storeTotals[store.Store_ID] || 0;
+    const count = storeCounts[store.Store_ID] || 0;
+    if (amount === 0 && count === 0) {
+      response += `🍳 ${store.Name}: R0 (0 orders)\n`;
+    }
+  });
+  
+  response += `\n💰 *TOTAL SO FAR*: ${formatMoney(total)}\n`;
+  response += `⏳ Finalizes Saturday after 7pm\n`;
+  response += `📅 Payout: Monday ${formatDate(payoutDate)}\n\n`;
+  response += `0️⃣ Back to main menu`;
+  
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+// Show last week details
+async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
+  const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
+  
+  const { data: orders } = await supabase
+    .from('Messages')
+    .select('Store_ID, Promoter_Commission')
+    .in('Store_ID', storeIds)
+    .gte('Timestamp', lastWeek.start.toISOString())
+    .lt('Timestamp', lastWeek.end.toISOString());
+  
+  const storeTotals = {};
+  const storeCounts = {};
+  stores.forEach(store => { 
+    storeTotals[store.Store_ID] = 0; 
+    storeCounts[store.Store_ID] = 0;
+  });
+  
+  (orders || []).forEach(order => {
+    storeTotals[order.Store_ID] += Number(order.Promoter_Commission) || 0;
+    storeCounts[order.Store_ID] += 1;
+  });
+  
+  const total = Object.values(storeTotals).reduce((sum, val) => sum + val, 0);
+  
+  if (total === 0) {
+    await sendWasenderMessage(phoneNumber,
+      `📆 *Last week* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)})\n\n` +
+      `No orders for this period.\n\n` +
+      `0️⃣ Back to main menu`);
+    return;
+  }
+  
+  // Payout date (Monday after week ended)
+  const payoutDate = new Date(lastWeek.end);
+  payoutDate.setDate(payoutDate.getDate() + 3);
+  
+  let response = `📆 *Last week* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)}) - COMPLETED\n\n`;
+  
+  stores.forEach(store => {
+    const amount = storeTotals[store.Store_ID] || 0;
+    const count = storeCounts[store.Store_ID] || 0;
+    if (amount > 0) {
+      response += `🍳 ${store.Name}: ${formatMoney(amount)} (${count} order${count !== 1 ? 's' : ''})\n`;
+    }
+  });
+  
+  response += `\n💰 *TOTAL*: ${formatMoney(total)}\n`;
+  response += `✅ PAID on Monday ${formatDate(payoutDate)}\n\n`;
+  response += `0️⃣ Back to main menu`;
+  
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+// Show all stores overview
+async function showAllStores(phoneNumber, promoter, stores, storeIds) {
+  const thisWeek = getWeekRange(new Date());
+  const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
+  
+  const [thisWeekOrders, lastWeekOrders] = await Promise.all([
+    supabase.from('Messages').select('Store_ID, Promoter_Commission').in('Store_ID', storeIds).gte('Timestamp', thisWeek.start.toISOString()).lt('Timestamp', thisWeek.end.toISOString()),
+    supabase.from('Messages').select('Store_ID, Promoter_Commission').in('Store_ID', storeIds).gte('Timestamp', lastWeek.start.toISOString()).lt('Timestamp', lastWeek.end.toISOString())
+  ]);
+  
+  const thisWeekTotals = {};
+  const lastWeekTotals = {};
+  stores.forEach(store => { 
+    thisWeekTotals[store.Store_ID] = 0; 
+    lastWeekTotals[store.Store_ID] = 0;
+  });
+  
+  (thisWeekOrders.data || []).forEach(order => {
+    thisWeekTotals[order.Store_ID] += Number(order.Promoter_Commission) || 0;
+  });
+  
+  (lastWeekOrders.data || []).forEach(order => {
+    lastWeekTotals[order.Store_ID] += Number(order.Promoter_Commission) || 0;
+  });
+  
+  let response = `📋 *ALL YOUR STORES*\n\n`;
+  
+  stores.forEach(store => {
+    const thisWeek = thisWeekTotals[store.Store_ID] || 0;
+    const lastWeek = lastWeekTotals[store.Store_ID] || 0;
+    response += `🍳 *${store.Name}*\n`;
+    response += `   This week: ${formatMoney(thisWeek)}\n`;
+    response += `   Last week: ${formatMoney(lastWeek)}\n`;
+  });
+  
+  response += `\n0️⃣ Back to main menu`;
+  
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+// Show this month
+async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
+  const now = new Date();
+  const monthRange = getMonthRange(now);
+  
+  const { data: orders } = await supabase
+    .from('Messages')
+    .select('Timestamp, Promoter_Commission')
+    .in('Store_ID', storeIds)
+    .gte('Timestamp', monthRange.start.toISOString())
+    .lt('Timestamp', monthRange.end.toISOString());
+  
+  // Calculate weekly totals
+  const weekTotals = [0, 0, 0, 0, 0];
+  const weekStatus = ['', '', '', '', ''];
+  
+  (orders || []).forEach(order => {
+    const orderDate = new Date(order.Timestamp);
+    const weekOfMonth = Math.floor((orderDate.getDate() - 1) / 7);
+    if (weekOfMonth < 5) {
+      weekTotals[weekOfMonth] += Number(order.Promoter_Commission) || 0;
+    }
+  });
+  
+  // Determine which weeks are complete
+  const today = now.getDay();
+  const currentWeek = Math.floor((now.getDate() - 1) / 7);
+  
+  for (let i = 0; i < 5; i++) {
+    if (i < currentWeek) {
+      weekStatus[i] = '✅';
+    } else if (i === currentWeek) {
+      weekStatus[i] = '⏳';
+    }
+  }
+  
+  const monthTotal = weekTotals.reduce((sum, val) => sum + val, 0);
+  
+  if (monthTotal === 0) {
+    await sendWasenderMessage(phoneNumber,
+      `📅 *${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()}*\n\n` +
+      `No orders recorded for this month.\n\n` +
+      `0️⃣ Back to main menu`);
+    return;
+  }
+  
+  const monthName = now.toLocaleString('default', { month: 'long' });
+  
+  let response = `📅 *${monthName} ${now.getFullYear()}*\n\n`;
+  
+  for (let i = 0; i < 5; i++) {
+    if (weekTotals[i] > 0 || weekStatus[i]) {
+      response += `Week ${i + 1}: ${formatMoney(weekTotals[i])} ${weekStatus[i]}\n`;
+    }
+  }
+  
+  response += `\n💰 *MONTH TOTAL*: ${formatMoney(monthTotal)}\n\n`;
+  response += `0️⃣ Back to main menu`;
+  
+  await sendWasenderMessage(phoneNumber, response);
+}
+
 exports.handler = async (event) => {
-  // Only accept POST requests from WasenderAPI
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   try {
-    // Parse the incoming webhook
     const payload = JSON.parse(event.body);
-    console.log('📩 Webhook received:', JSON.stringify(payload, null, 2));
+    console.log('📩 Webhook received');
     
-    // Extract message details
     const message = payload.data?.messages;
     if (!message) {
       return { statusCode: 200, body: 'OK' };
     }
     
-    // 🔥 FIX: Ignore messages sent by ME (the bot) to prevent infinite loop
+    // 🔥 FIX: Ignore messages sent by ME (the bot)
     if (message.key?.fromMe === true) {
-      console.log('⏭️ Ignoring own message (fromMe=true) - preventing loop');
+      console.log('⏭️ Ignoring own message');
       return { statusCode: 200, body: 'OK' };
     }
     
     const messageKey = message.key;
     const messageText = message.message?.conversation || message.messageBody || '';
-    
-    // Extract phone number using our new function
     const formattedNumber = extractPhoneNumber(messageKey);
     
     console.log(`📱 From: ${formattedNumber}, Text: "${messageText}"`);
 
-    // Handle different commands
     const command = messageText.toUpperCase().trim();
     
-    // EARNINGS command - show main menu
-    if (command === 'EARNINGS' || command === '1') {
-      // Find promoter by phone number
-      const { data: promoter, error } = await supabase
+    // Handle numeric commands first (menu navigation)
+    if (['0', '1', '2', '3', '4'].includes(command)) {
+      // Find promoter first
+      const { data: promoter } = await supabase
         .from('promoters')
         .select('*')
         .eq('phone', formattedNumber)
         .maybeSingle();
       
-      console.log('🔍 Promoter lookup:', { promoter, error, phone: formattedNumber });
-      
       if (!promoter) {
-        await sendWasenderMessage(formattedNumber, 
-          `❌ You're not registered as a promoter.\n\nPhone: ${formattedNumber}\n\nContact BEIJU to get started.`);
         return { statusCode: 200, body: 'OK' };
       }
       
-      // Get all stores for this promoter
+      // Get stores
       const { data: stores } = await supabase
         .from('Stores')
         .select('Store_ID, Name')
@@ -156,96 +443,61 @@ exports.handler = async (event) => {
       
       if (!stores || stores.length === 0) {
         await sendWasenderMessage(formattedNumber,
-          `👋 ${promoter.promoter_name}\n\nYou have no stores yet. Add some to start earning!`);
+          `👋 ${promoter.promoter_name}\n\nYou have no stores yet.`);
         return { statusCode: 200, body: 'OK' };
       }
       
       const storeIds = stores.map(s => s.Store_ID);
       
-      // Get last week's completed earnings
-      const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
-      const { data: lastWeekOrders } = await supabase
-        .from('Messages')
-        .select('Store_ID, Promoter_Commission')
-        .in('Store_ID', storeIds)
-        .gte('Timestamp', lastWeek.start.toISOString())
-        .lt('Timestamp', lastWeek.end.toISOString());
-      
-      const lastWeekTotal = (lastWeekOrders || []).reduce(
-        (sum, o) => sum + (Number(o.Promoter_Commission) || 0), 0
-      );
-      
-      // Get this week's in-progress earnings
-      const thisWeek = getWeekRange(new Date());
-      const { data: thisWeekOrders } = await supabase
-        .from('Messages')
-        .select('Store_ID, Promoter_Commission')
-        .in('Store_ID', storeIds)
-        .gte('Timestamp', thisWeek.start.toISOString())
-        .lt('Timestamp', thisWeek.end.toISOString());
-      
-      const thisWeekTotal = (thisWeekOrders || []).reduce(
-        (sum, o) => sum + (Number(o.Promoter_Commission) || 0), 0
-      );
-      
-      // Calculate per-store totals for this week
-      const storeTotals = {};
-      stores.forEach(store => { storeTotals[store.Store_ID] = 0; });
-      (thisWeekOrders || []).forEach(order => {
-        storeTotals[order.Store_ID] += Number(order.Promoter_Commission) || 0;
-      });
-      
-      // Build the response message
-      let response = `👋 *${promoter.promoter_name}*, your earnings:\n\n`;
-      
-      // Last week (paid)
-      response += `📆 *Last week* (${lastWeek.start.toLocaleDateString()} - ${lastWeek.end.toLocaleDateString()})\n`;
-      response += `💰 ${formatMoney(lastWeekTotal)} ✅ *PAID*\n\n`;
-      
-      // This week (in progress)
-      response += `📆 *This week* (${thisWeek.start.toLocaleDateString()} - in progress)\n`;
-      response += `💰 ${formatMoney(thisWeekTotal)} *(pending)*\n\n`;
-      
-      // Store breakdown
-      response += `*Your stores this week:*\n`;
-      stores.slice(0, 5).forEach(store => {
-        response += `🍳 ${store.Name}: ${formatMoney(storeTotals[store.Store_ID] || 0)}\n`;
-      });
-      
-      if (stores.length > 5) {
-        response += `... and ${stores.length - 5} more stores\n`;
+      // Handle menu options
+      if (command === '0') {
+        await showMainMenu(formattedNumber, promoter);
+      } else if (command === '1') {
+        await showThisWeek(formattedNumber, promoter, stores, storeIds);
+      } else if (command === '2') {
+        await showLastWeek(formattedNumber, promoter, stores, storeIds);
+      } else if (command === '3') {
+        await showAllStores(formattedNumber, promoter, stores, storeIds);
+      } else if (command === '4') {
+        await showThisMonth(formattedNumber, promoter, stores, storeIds);
       }
-      
-      response += `\n📱 *Reply with:*\n`;
-      response += `1️⃣ This week details\n`;
-      response += `2️⃣ Last week details\n`;
-      response += `3️⃣ All stores breakdown\n`;
-      response += `4️⃣ This month\n`;
-      
-      await sendWasenderMessage(formattedNumber, response);
-      console.log('✅ Response sent to:', formattedNumber);
     }
     
-    // Handle numeric menu options
-    else if (['1', '2', '3', '4'].includes(command)) {
-      // Similar logic for detailed views
-      // We'll implement these next
-      await sendWasenderMessage(formattedNumber, 
-        `📊 Detailed view coming soon!\n\nReply EARNINGS for main menu.`);
+    // Handle EARNINGS command - show main menu
+    else if (command === 'EARNINGS') {
+      const { data: promoter } = await supabase
+        .from('promoters')
+        .select('*')
+        .eq('phone', formattedNumber)
+        .maybeSingle();
+      
+      if (!promoter) {
+        await sendWasenderMessage(formattedNumber, 
+          `❌ You're not registered as a promoter.\n\nPhone: ${formattedNumber}\n\nContact BEIJU to get started.`);
+        return { statusCode: 200, body: 'OK' };
+      }
+      
+      await showMainMenu(formattedNumber, promoter);
     }
     
     // Unknown command
-    else {
-      await sendWasenderMessage(formattedNumber,
-        `📱 *BEIJU Promoter System*\n\n` +
-        `Reply *EARNINGS* to see your earnings.\n\n` +
-        `Need help? Contact support.`);
+    else if (command && command !== '') {
+      const { data: promoter } = await supabase
+        .from('promoters')
+        .select('*')
+        .eq('phone', formattedNumber)
+        .maybeSingle();
+      
+      if (promoter) {
+        await sendWasenderMessage(formattedNumber,
+          `📱 *BEIJU Promoter System*\n\nReply *EARNINGS* to see your earnings.`);
+      }
     }
     
     return { statusCode: 200, body: 'OK' };
     
   } catch (error) {
     console.error('Webhook error:', error);
-    return { statusCode: 200, body: 'OK' }; // Always return 200 to Wasender
+    return { statusCode: 200, body: 'OK' };
   }
 };
