@@ -49,6 +49,54 @@ function getWeekRange(date = new Date()) {
 // Format currency
 const formatMoney = (amount) => `R${Number(amount).toFixed(2)}`;
 
+// Extract phone number properly from WhatsApp LID format
+function extractPhoneNumber(messageKey) {
+  console.log('🔍 Extracting phone from:', JSON.stringify(messageKey));
+  
+  let phoneNumber = null;
+  
+  // Method 1: Use senderPn if available (this is the phone number format)
+  if (messageKey.senderPn) {
+    phoneNumber = messageKey.senderPn.split('@')[0];
+    console.log('✅ Found senderPn:', phoneNumber);
+  }
+  // Method 2: Use cleanedSenderPn if available
+  else if (messageKey.cleanedSenderPn) {
+    phoneNumber = messageKey.cleanedSenderPn;
+    console.log('✅ Found cleanedSenderPn:', phoneNumber);
+  }
+  // Method 3: Fallback to remoteJid but clean it
+  else {
+    let rawNumber = messageKey.remoteJid.split('@')[0];
+    // Remove any non-digits
+    phoneNumber = rawNumber.replace(/\D/g, '');
+    console.log('⚠️ Using cleaned remoteJid:', phoneNumber);
+  }
+  
+  // Ensure it has South African country code (27)
+  if (phoneNumber) {
+    // Remove any + or spaces
+    phoneNumber = phoneNumber.replace(/\D/g, '');
+    
+    // Format for SA numbers
+    if (phoneNumber.length === 9) {
+      phoneNumber = '27' + phoneNumber;
+    } else if (phoneNumber.length === 10 && phoneNumber.startsWith('0')) {
+      phoneNumber = '27' + phoneNumber.slice(1);
+    } else if (phoneNumber.length === 11 && phoneNumber.startsWith('27')) {
+      // Already correct format
+    } else if (phoneNumber.length === 12 && phoneNumber.startsWith('27')) {
+      // Already correct format
+    }
+    
+    // Add + for database lookup
+    phoneNumber = '+' + phoneNumber;
+  }
+  
+  console.log('📱 Final formatted number:', phoneNumber);
+  return phoneNumber;
+}
+
 exports.handler = async (event) => {
   // Only accept POST requests from WasenderAPI
   if (event.httpMethod !== 'POST') {
@@ -58,18 +106,21 @@ exports.handler = async (event) => {
   try {
     // Parse the incoming webhook
     const payload = JSON.parse(event.body);
-    console.log('📩 Webhook received:', payload);
+    console.log('📩 Webhook received:', JSON.stringify(payload, null, 2));
     
     // Extract message details
-    const message = payload.data?.messages?.[0];
+    const message = payload.data?.messages;
     if (!message) {
       return { statusCode: 200, body: 'OK' };
     }
     
-    const fromNumber = message.key.remoteJid.split('@')[0];
-    const messageText = message.message?.conversation || '';
+    const messageKey = message.key;
+    const messageText = message.message?.conversation || message.messageBody || '';
     
-    console.log(`📱 From: ${fromNumber}, Text: "${messageText}"`);
+    // Extract phone number using our new function
+    const formattedNumber = extractPhoneNumber(messageKey);
+    
+    console.log(`📱 From: ${formattedNumber}, Text: "${messageText}"`);
 
     // Handle different commands
     const command = messageText.toUpperCase().trim();
@@ -77,15 +128,17 @@ exports.handler = async (event) => {
     // EARNINGS command - show main menu
     if (command === 'EARNINGS' || command === '1') {
       // Find promoter by phone number
-      const { data: promoter } = await supabase
+      const { data: promoter, error } = await supabase
         .from('promoters')
         .select('*')
-        .eq('phone', `+${fromNumber}`)
-        .single();
+        .eq('phone', formattedNumber)
+        .maybeSingle();
+      
+      console.log('🔍 Promoter lookup:', { promoter, error, phone: formattedNumber });
       
       if (!promoter) {
-        await sendWasenderMessage(fromNumber, 
-          `❌ You're not registered as a promoter.\n\nContact BEIJU to get started.`);
+        await sendWasenderMessage(formattedNumber, 
+          `❌ You're not registered as a promoter.\n\nPhone: ${formattedNumber}\n\nContact BEIJU to get started.`);
         return { statusCode: 200, body: 'OK' };
       }
       
@@ -96,7 +149,7 @@ exports.handler = async (event) => {
         .eq('promoter_id', promoter.id);
       
       if (!stores || stores.length === 0) {
-        await sendWasenderMessage(fromNumber,
+        await sendWasenderMessage(formattedNumber,
           `👋 ${promoter.promoter_name}\n\nYou have no stores yet. Add some to start earning!`);
         return { statusCode: 200, body: 'OK' };
       }
@@ -163,20 +216,21 @@ exports.handler = async (event) => {
       response += `3️⃣ All stores breakdown\n`;
       response += `4️⃣ This month\n`;
       
-      await sendWasenderMessage(fromNumber, response);
+      await sendWasenderMessage(formattedNumber, response);
+      console.log('✅ Response sent to:', formattedNumber);
     }
     
     // Handle numeric menu options
     else if (['1', '2', '3', '4'].includes(command)) {
       // Similar logic for detailed views
       // We'll implement these next
-      await sendWasenderMessage(fromNumber, 
+      await sendWasenderMessage(formattedNumber, 
         `📊 Detailed view coming soon!\n\nReply EARNINGS for main menu.`);
     }
     
     // Unknown command
     else {
-      await sendWasenderMessage(fromNumber,
+      await sendWasenderMessage(formattedNumber,
         `📱 *BEIJU Promoter System*\n\n` +
         `Reply *EARNINGS* to see your earnings.\n\n` +
         `Need help? Contact support.`);
