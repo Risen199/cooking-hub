@@ -323,8 +323,10 @@ exports.handler = async (event) => {
 
         const totalAmount = Number(data.Total_Amount) || 0;
         const commissionPool = Number((totalAmount * 0.15).toFixed(2));
-        const promoterCommission = Number((commissionPool * 0.3).toFixed(2));
-        const companyCommission = Number((commissionPool * 0.7).toFixed(2));
+        
+        // 🔥 CHANGED: Commission split from 30/70 to 35/65
+        const promoterCommission = Number((commissionPool * 0.35).toFixed(2)); // 35% to promoter
+        const companyCommission = Number((commissionPool * 0.65).toFixed(2));  // 65% to company
 
         // 1. Insert into Messages table
         const { error: messagesError } = await supabase
