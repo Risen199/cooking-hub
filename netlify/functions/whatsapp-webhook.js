@@ -531,15 +531,16 @@ exports.handler = async (event) => {
         .maybeSingle();
       
       if (!promoter) {
+        // 🔥 NEW: Professional auto-reply for non-promoters
         await sendWasenderMessage(formattedNumber, 
-          `❌ You're not registered as a promoter.\n\nPhone: ${formattedNumber}\n\nContact BEIJU to get started.`);
+          `Thank you for contacting BEIJU.\nWe've received your message and will respond within 24 hours.\n\nFor support: beiju.enquiries@gmail.com\n\n🇿 Thank you for supporting local township kitchens!`);
         return { statusCode: 200, body: 'OK' };
       }
       
       await showMainMenu(formattedNumber, promoter);
     }
     
-    // Unknown command
+    // Unknown command - Professional auto-reply for non-promoters
     else if (command && command !== '') {
       const { data: promoter } = await supabase
         .from('promoters')
@@ -548,8 +549,13 @@ exports.handler = async (event) => {
         .maybeSingle();
       
       if (promoter) {
+        // Promoter typed something random - remind them
         await sendWasenderMessage(formattedNumber,
           `📱 *BEIJU Promoter System*\n\nReply *EARNINGS* to see your earnings.`);
+      } else {
+        // 🔥 NEW: Professional auto-reply for non-promoters
+        await sendWasenderMessage(formattedNumber,
+          `Thank you for contacting BEIJU.\nWe've received your message and will respond within 24 hours.\n\nFor support: beiju.enquiries@gmail.com\n\n🇿 Thank you for supporting local township kitchens!`);
       }
     }
     
