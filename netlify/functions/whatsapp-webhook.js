@@ -92,7 +92,7 @@ function extractPhoneNumber(messageKey) {
   return phoneNumber;
 }
 
-// Show main menu
+// Show main menu - OPTION B (shows total orders + 35% commission)
 async function showMainMenu(phoneNumber, promoter) {
   // Get all stores for this promoter
   const { data: stores } = await supabase
@@ -117,9 +117,12 @@ async function showMainMenu(phoneNumber, promoter) {
     .gte('Timestamp', lastWeek.start.toISOString())
     .lt('Timestamp', lastWeek.end.toISOString());
   
-  const lastWeekTotal = (lastWeekOrders || []).reduce(
+  const lastWeekCommission = (lastWeekOrders || []).reduce(
     (sum, o) => sum + (Number(o.Promoter_Commission) || 0), 0
   );
+  
+  // Calculate last week total orders (before commission)
+  const lastWeekTotal = lastWeekCommission * (100/35);
   
   // Get this week's in-progress earnings
   const thisWeek = getWeekRange(new Date());
@@ -130,11 +133,14 @@ async function showMainMenu(phoneNumber, promoter) {
     .gte('Timestamp', thisWeek.start.toISOString())
     .lt('Timestamp', thisWeek.end.toISOString());
   
-  const thisWeekTotal = (thisWeekOrders || []).reduce(
+  const thisWeekCommission = (thisWeekOrders || []).reduce(
     (sum, o) => sum + (Number(o.Promoter_Commission) || 0), 0
   );
   
-  // Calculate per-store totals for this week (top 2 for preview)
+  // Calculate this week total orders (before commission)
+  const thisWeekTotal = thisWeekCommission * (100/35);
+  
+  // Calculate per-store totals for this week
   const storeTotals = {};
   stores.forEach(store => { storeTotals[store.Store_ID] = 0; });
   (thisWeekOrders || []).forEach(order => {
@@ -146,18 +152,25 @@ async function showMainMenu(phoneNumber, promoter) {
     (storeTotals[b.Store_ID] || 0) - (storeTotals[a.Store_ID] || 0)
   );
   
+  // Build response with Option B format
   let response = `👋 *${promoter.promoter_name}*, your earnings:\n\n`;
   
-  response += `📆 *Last week* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)}): `;
-  response += `${formatMoney(lastWeekTotal)} ${lastWeekTotal > 0 ? '✅' : ''}\n`;
+  // Last week
+  response += `📆 *LAST WEEK* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)})\n`;
+  response += `🍳 Total orders: ${formatMoney(lastWeekTotal)}\n`;
+  response += `💰 Your 35%: ${formatMoney(lastWeekCommission)} ${lastWeekCommission > 0 ? '✅' : ''}\n\n`;
   
-  response += `📆 *This week* (${formatDate(thisWeek.start)}-now): `;
-  response += `${formatMoney(thisWeekTotal)} ${thisWeekTotal > 0 ? '⏳' : ''}\n\n`;
+  // This week
+  response += `📆 *THIS WEEK* (${formatDate(thisWeek.start)}-now)\n`;
+  response += `🍳 Total orders: ${formatMoney(thisWeekTotal)} so far\n`;
+  response += `💰 Your 35%: ${formatMoney(thisWeekCommission)} ${thisWeekCommission > 0 ? '⏳' : ''}\n\n`;
   
+  // Store preview
   response += `*Your stores this week:*\n`;
   sortedStores.slice(0, 3).forEach(store => {
-    const amount = storeTotals[store.Store_ID] || 0;
-    response += `🍳 ${store.Name}: ${formatMoney(amount)}\n`;
+    const commission = storeTotals[store.Store_ID] || 0;
+    const total = commission * (100/35);
+    response += `🍳 ${store.Name}: ${formatMoney(total)} total | Your cut: ${formatMoney(commission)}\n`;
   });
   
   if (stores.length > 3) {
@@ -196,9 +209,10 @@ async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
     storeCounts[order.Store_ID] += 1;
   });
   
-  const total = Object.values(storeTotals).reduce((sum, val) => sum + val, 0);
+  const totalCommission = Object.values(storeTotals).reduce((sum, val) => sum + val, 0);
+  const totalOrders = totalCommission * (100/35);
   
-  if (total === 0) {
+  if (totalCommission === 0) {
     await sendWasenderMessage(phoneNumber,
       `📆 *This week* (${formatDate(thisWeek.start)}-now)\n\n` +
       `No orders yet this week.\n\n` +
@@ -214,23 +228,25 @@ async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
   let response = `📆 *This week* (${formatDate(thisWeek.start)}-now) - in progress\n\n`;
   
   stores.forEach(store => {
-    const amount = storeTotals[store.Store_ID] || 0;
+    const commission = storeTotals[store.Store_ID] || 0;
+    const total = commission * (100/35);
     const count = storeCounts[store.Store_ID] || 0;
-    if (amount > 0 || count > 0) {
-      response += `🍳 ${store.Name}: ${formatMoney(amount)} (${count} order${count !== 1 ? 's' : ''})\n`;
+    if (commission > 0) {
+      response += `🍳 ${store.Name}: ${formatMoney(total)} total | `;
+      response += `Your cut: ${formatMoney(commission)} (${count} order${count !== 1 ? 's' : ''})\n`;
     }
   });
   
   // Show stores with zero orders
   stores.forEach(store => {
-    const amount = storeTotals[store.Store_ID] || 0;
-    const count = storeCounts[store.Store_ID] || 0;
-    if (amount === 0 && count === 0) {
+    const commission = storeTotals[store.Store_ID] || 0;
+    if (commission === 0) {
       response += `🍳 ${store.Name}: R0 (0 orders)\n`;
     }
   });
   
-  response += `\n💰 *TOTAL SO FAR*: ${formatMoney(total)}\n`;
+  response += `\n💰 *TOTAL ORDERS*: ${formatMoney(totalOrders)}\n`;
+  response += `💵 *YOUR 35%*: ${formatMoney(totalCommission)}\n`;
   response += `⏳ Finalizes Saturday after 7pm\n`;
   response += `📅 Payout: Monday ${formatDate(payoutDate)}\n\n`;
   response += `0️⃣ Back to main menu`;
@@ -261,9 +277,10 @@ async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
     storeCounts[order.Store_ID] += 1;
   });
   
-  const total = Object.values(storeTotals).reduce((sum, val) => sum + val, 0);
+  const totalCommission = Object.values(storeTotals).reduce((sum, val) => sum + val, 0);
+  const totalOrders = totalCommission * (100/35);
   
-  if (total === 0) {
+  if (totalCommission === 0) {
     await sendWasenderMessage(phoneNumber,
       `📆 *Last week* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)})\n\n` +
       `No orders for this period.\n\n` +
@@ -278,14 +295,17 @@ async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
   let response = `📆 *Last week* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)}) - COMPLETED\n\n`;
   
   stores.forEach(store => {
-    const amount = storeTotals[store.Store_ID] || 0;
+    const commission = storeTotals[store.Store_ID] || 0;
+    const total = commission * (100/35);
     const count = storeCounts[store.Store_ID] || 0;
-    if (amount > 0) {
-      response += `🍳 ${store.Name}: ${formatMoney(amount)} (${count} order${count !== 1 ? 's' : ''})\n`;
+    if (commission > 0) {
+      response += `🍳 ${store.Name}: ${formatMoney(total)} total | `;
+      response += `Your cut: ${formatMoney(commission)} (${count} order${count !== 1 ? 's' : ''})\n`;
     }
   });
   
-  response += `\n💰 *TOTAL*: ${formatMoney(total)}\n`;
+  response += `\n💰 *TOTAL ORDERS*: ${formatMoney(totalOrders)}\n`;
+  response += `💵 *YOUR 35%*: ${formatMoney(totalCommission)}\n`;
   response += `✅ PAID on Monday ${formatDate(payoutDate)}\n\n`;
   response += `0️⃣ Back to main menu`;
   
@@ -320,11 +340,14 @@ async function showAllStores(phoneNumber, promoter, stores, storeIds) {
   let response = `📋 *ALL YOUR STORES*\n\n`;
   
   stores.forEach(store => {
-    const thisWeek = thisWeekTotals[store.Store_ID] || 0;
-    const lastWeek = lastWeekTotals[store.Store_ID] || 0;
+    const thisWeekCommission = thisWeekTotals[store.Store_ID] || 0;
+    const thisWeekTotal = thisWeekCommission * (100/35);
+    const lastWeekCommission = lastWeekTotals[store.Store_ID] || 0;
+    const lastWeekTotal = lastWeekCommission * (100/35);
+    
     response += `🍳 *${store.Name}*\n`;
-    response += `   This week: ${formatMoney(thisWeek)}\n`;
-    response += `   Last week: ${formatMoney(lastWeek)}\n`;
+    response += `   This week: ${formatMoney(thisWeekTotal)} total | Your cut: ${formatMoney(thisWeekCommission)}\n`;
+    response += `   Last week: ${formatMoney(lastWeekTotal)} total | Your cut: ${formatMoney(lastWeekCommission)}\n`;
   });
   
   response += `\n0️⃣ Back to main menu`;
@@ -368,9 +391,10 @@ async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
     }
   }
   
-  const monthTotal = weekTotals.reduce((sum, val) => sum + val, 0);
+  const monthCommission = weekTotals.reduce((sum, val) => sum + val, 0);
+  const monthTotal = monthCommission * (100/35);
   
-  if (monthTotal === 0) {
+  if (monthCommission === 0) {
     await sendWasenderMessage(phoneNumber,
       `📅 *${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()}*\n\n` +
       `No orders recorded for this month.\n\n` +
@@ -384,11 +408,14 @@ async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
   
   for (let i = 0; i < 5; i++) {
     if (weekTotals[i] > 0 || weekStatus[i]) {
-      response += `Week ${i + 1}: ${formatMoney(weekTotals[i])} ${weekStatus[i]}\n`;
+      const weekTotal = weekTotals[i] * (100/35);
+      response += `Week ${i + 1}: ${formatMoney(weekTotal)} total | `;
+      response += `Your cut: ${formatMoney(weekTotals[i])} ${weekStatus[i]}\n`;
     }
   }
   
-  response += `\n💰 *MONTH TOTAL*: ${formatMoney(monthTotal)}\n\n`;
+  response += `\n💰 *MONTH TOTAL ORDERS*: ${formatMoney(monthTotal)}\n`;
+  response += `💵 *YOUR 35%*: ${formatMoney(monthCommission)}\n\n`;
   response += `0️⃣ Back to main menu`;
   
   await sendWasenderMessage(phoneNumber, response);
