@@ -114,6 +114,12 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: 'OK' };
     }
     
+    // 🔥 FIX: Ignore messages sent by ME (the bot) to prevent infinite loop
+    if (message.key?.fromMe === true) {
+      console.log('⏭️ Ignoring own message (fromMe=true) - preventing loop');
+      return { statusCode: 200, body: 'OK' };
+    }
+    
     const messageKey = message.key;
     const messageText = message.message?.conversation || message.messageBody || '';
     
