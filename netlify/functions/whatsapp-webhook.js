@@ -92,10 +92,27 @@ function extractPhoneNumber(messageKey) {
   return phoneNumber;
 }
 
-// Check if conversation is still active (within 8 hours)
-async function isConversationActive(phoneNumber) {
+// Check if a human has EVER replied to this conversation
+async function hasHumanReplied(phoneNumber) {
   try {
-    // Get the most recent message from this number
+    // Check if there's ANY message in this conversation where fromMe = true (YOU replied)
+    const { data: humanReplies } = await supabase
+      .from('wasender_logs')
+      .select('id')
+      .eq('customer_phone', phoneNumber)
+      .eq('message_type', 'human_reply')
+      .limit(1);
+
+    return humanReplies && humanReplies.length > 0;
+  } catch (error) {
+    console.error('Error checking human replies:', error);
+    return false;
+  }
+}
+
+// Check if conversation is within 8-hour active window
+async function isWithinActiveWindow(phoneNumber) {
+  try {
     const { data: recentMessages } = await supabase
       .from('wasender_logs')
       .select('created_at')
@@ -104,18 +121,17 @@ async function isConversationActive(phoneNumber) {
       .limit(1);
 
     if (!recentMessages || recentMessages.length === 0) {
-      return false; // No conversation history
+      return false;
     }
 
     const lastMessageTime = new Date(recentMessages[0].created_at);
     const now = new Date();
     const hoursSinceLastMessage = (now - lastMessageTime) / (1000 * 60 * 60);
 
-    // If less than 8 hours have passed, conversation is still active
     return hoursSinceLastMessage < 8;
   } catch (error) {
-    console.error('Error checking conversation activity:', error);
-    return false; // Default to inactive on error
+    console.error('Error checking active window:', error);
+    return false;
   }
 }
 
@@ -524,94 +540,87 @@ exports.handler = async (event) => {
     // Log this message
     await logMessage(formattedNumber, messageText, 'incoming');
 
-    // Check if conversation is still active (within 8 hours)
-    const isActive = await isConversationActive(formattedNumber);
-    console.log(`🕒 Conversation active: ${isActive}`);
+    // Check if a human has EVER replied to this conversation
+    const humanReplied = await hasHumanReplied(formattedNumber);
+    console.log(`👤 Human has replied before: ${humanReplied}`);
+
+    // Check if within 8-hour active window
+    const withinWindow = await isWithinActiveWindow(formattedNumber);
+    console.log(`⏰ Within 8-hour window: ${withinWindow}`);
 
     const command = messageText.toUpperCase().trim();
 
-    // Handle numeric commands first (menu navigation)
-    if (['0', '1', '2', '3', '4'].includes(command)) {
-      // Find promoter first
-      const { data: promoter } = await supabase
-        .from('promoters')
-        .select('*')
-        .eq('phone', formattedNumber)
-        .maybeSingle();
+    // ===========================================
+    // CASE 1: PROMOTER (always get full access)
+    // ===========================================
+    const { data: promoter } = await supabase
+      .from('promoters')
+      .select('*')
+      .eq('phone', formattedNumber)
+      .maybeSingle();
 
-      if (!promoter) {
-        return { statusCode: 200, body: 'OK' };
-      }
-
-      // Get stores
-      const { data: stores } = await supabase
-        .from('Stores')
-        .select('Store_ID, Name')
-        .eq('promoter_id', promoter.id);
-
-      if (!stores || stores.length === 0) {
-        await sendWasenderMessage(formattedNumber,
-          `👋 ${promoter.promoter_name}\n\nYou have no stores yet.`);
-        return { statusCode: 200, body: 'OK' };
-      }
-
-      const storeIds = stores.map(s => s.Store_ID);
-
-      // Handle menu options
-      if (command === '0') {
+    if (promoter) {
+      console.log('✅ Promoter detected - showing earnings menu');
+      
+      if (command === 'EARNINGS') {
         await showMainMenu(formattedNumber, promoter);
-      } else if (command === '1') {
-        await showThisWeek(formattedNumber, promoter, stores, storeIds);
-      } else if (command === '2') {
-        await showLastWeek(formattedNumber, promoter, stores, storeIds);
-      } else if (command === '3') {
-        await showAllStores(formattedNumber, promoter, stores, storeIds);
-      } else if (command === '4') {
-        await showThisMonth(formattedNumber, promoter, stores, storeIds);
-      }
-    }
+      } else if (['0', '1', '2', '3', '4'].includes(command)) {
+        // Get stores
+        const { data: stores } = await supabase
+          .from('Stores')
+          .select('Store_ID, Name')
+          .eq('promoter_id', promoter.id);
 
-    // Handle EARNINGS command - show main menu
-    else if (command === 'EARNINGS') {
-      const { data: promoter } = await supabase
-        .from('promoters')
-        .select('*')
-        .eq('phone', formattedNumber)
-        .maybeSingle();
-
-      if (!promoter) {
-        // Only send auto-reply if conversation is NOT active
-        if (!isActive) {
-          const autoReply = `Thank you for contacting BEIJU.\n\nOne of our team will respond within 8 hours. If you don't hear back, just message again and we'll get right to you.\n\nFor support: beiju.enquiries@gmail.com\n\n🇿 Beiju.co.za`;
-          await sendWasenderMessage(formattedNumber, autoReply);
-          await logMessage(formattedNumber, autoReply, 'auto_response', 'sent');
+        if (!stores || stores.length === 0) {
+          await sendWasenderMessage(formattedNumber,
+            `👋 ${promoter.promoter_name}\n\nYou have no stores yet.`);
+          return { statusCode: 200, body: 'OK' };
         }
-        return { statusCode: 200, body: 'OK' };
-      }
 
-      await showMainMenu(formattedNumber, promoter);
-    }
+        const storeIds = stores.map(s => s.Store_ID);
 
-    // Unknown command
-    else if (command && command !== '') {
-      const { data: promoter } = await supabase
-        .from('promoters')
-        .select('*')
-        .eq('phone', formattedNumber)
-        .maybeSingle();
-
-      if (promoter) {
-        // Promoter typed something random - remind them
+        if (command === '0') {
+          await showMainMenu(formattedNumber, promoter);
+        } else if (command === '1') {
+          await showThisWeek(formattedNumber, promoter, stores, storeIds);
+        } else if (command === '2') {
+          await showLastWeek(formattedNumber, promoter, stores, storeIds);
+        } else if (command === '3') {
+          await showAllStores(formattedNumber, promoter, stores, storeIds);
+        } else if (command === '4') {
+          await showThisMonth(formattedNumber, promoter, stores, storeIds);
+        }
+      } else {
+        // Promoter typed something random
         const reminderMsg = `📱 *BEIJU Promoter System*\n\nReply *EARNINGS* to see your earnings.`;
         await sendWasenderMessage(formattedNumber, reminderMsg);
         await logMessage(formattedNumber, reminderMsg, 'auto_response', 'sent');
+      }
+      
+      return { statusCode: 200, body: 'OK' };
+    }
+
+    // ===========================================
+    // CASE 2: RANDOM PERSON (receptionist mode)
+    // ===========================================
+    console.log('👤 Random person - applying receptionist logic');
+
+    // If human has NEVER replied to this conversation
+    if (!humanReplied) {
+      console.log('🤖 No human reply yet - auto-replying');
+      const autoReply = `Thank you for contacting BEIJU.\n\nOne of our team will respond within 8 hours. If you don't hear back, just message again and we'll get right to you.\n\nFor support: beiju.enquiries@gmail.com\n\n🇿 Beiju.co.za`;
+      await sendWasenderMessage(formattedNumber, autoReply);
+      await logMessage(formattedNumber, autoReply, 'auto_response', 'sent');
+    } 
+    // Human HAS replied before, check the 8-hour window
+    else {
+      if (!withinWindow) {
+        console.log('⏰ 8-hour window expired - auto-replying again');
+        const autoReply = `Thank you for contacting BEIJU.\n\nOne of our team will respond within 8 hours. If you don't hear back, just message again and we'll get right to you.\n\nFor support: beiju.enquiries@gmail.com\n\n🇿 Beiju.co.za`;
+        await sendWasenderMessage(formattedNumber, autoReply);
+        await logMessage(formattedNumber, autoReply, 'auto_response', 'sent');
       } else {
-        // Only send auto-reply if conversation is NOT active
-        if (!isActive) {
-          const autoReply = `Thank you for contacting BEIJU.\n\nOne of our team will respond within 8 hours. If you don't hear back, just message again and we'll get right to you.\n\nFor support: beiju.enquiries@gmail.com\n\n🇿 Beiju.co.za`;
-          await sendWasenderMessage(formattedNumber, autoReply);
-          await logMessage(formattedNumber, autoReply, 'auto_response', 'sent');
-        }
+        console.log('🤫 Within 8-hour window - staying silent');
       }
     }
 
