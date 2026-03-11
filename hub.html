@@ -282,13 +282,22 @@
 
       document.getElementById('store-count').textContent = data.stores.length;
 
+      // 🔥 FIXED: Dynamic Status_Message from database
       const storesHTML = data.stores.map(store => {
         const storeImage = store.Hero_URL || store.Banner_URL || 'assets/images/image.webp';
         const storeLink = store.slug ? `/${store.slug}` : `store-view.html?storeId=${store.Store_ID}&from=hub&township=${code}`;
         
+        // 👇 Check if store is temporarily closed and show the actual Status_Message
+        let closedBadge = '';
+        if (store.Temporarily_Closed) {
+          const statusMessage = store.Status_Message || 'Temporarily Closed';
+          closedBadge = `<span class="badge bg-danger position-absolute" style="top:10px; left:10px; z-index:10;">${statusMessage}</span>`;
+        }
+        
         return `
         <div class="col-6 col-lg-3">
-          <div class="card store-card h-100 shadow-sm border-0">
+          <div class="card store-card h-100 shadow-sm border-0 position-relative">
+            ${closedBadge}
             <img src="${storeImage}" 
                  class="card-img-top" 
                  style="height:160px; object-fit:cover;"
