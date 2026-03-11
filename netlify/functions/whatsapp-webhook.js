@@ -95,7 +95,6 @@ function extractPhoneNumber(messageKey) {
 // Check if a human has EVER replied to this conversation
 async function hasHumanReplied(phoneNumber) {
   try {
-    // Check if there's ANY message in this conversation where fromMe = true (YOU replied)
     const { data: humanReplies } = await supabase
       .from('wasender_logs')
       .select('id')
@@ -152,7 +151,6 @@ async function logMessage(phoneNumber, messageText, messageType, status = 'recei
 
 // Show main menu - CORRECTED MATH
 async function showMainMenu(phoneNumber, promoter) {
-  // Get all stores for this promoter
   const { data: stores } = await supabase
     .from('Stores')
     .select('Store_ID, Name')
@@ -166,7 +164,6 @@ async function showMainMenu(phoneNumber, promoter) {
 
   const storeIds = stores.map(s => s.Store_ID);
 
-  // Get last week's completed orders
   const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
   const { data: lastWeekOrders } = await supabase
     .from('Messages')
@@ -181,7 +178,6 @@ async function showMainMenu(phoneNumber, promoter) {
   const lastWeekHubCommission = lastWeekTotal * 0.15;
   const lastWeekPromoterCommission = lastWeekHubCommission * 0.35;
 
-  // Get this week's in-progress orders
   const thisWeek = getWeekRange(new Date());
   const { data: thisWeekOrders } = await supabase
     .from('Messages')
@@ -196,7 +192,6 @@ async function showMainMenu(phoneNumber, promoter) {
   const thisWeekHubCommission = thisWeekTotal * 0.15;
   const thisWeekPromoterCommission = thisWeekHubCommission * 0.35;
 
-  // Get per-store totals for this week preview
   const { data: storeOrders } = await supabase
     .from('Messages')
     .select('Store_ID, Total_Amount')
@@ -210,27 +205,22 @@ async function showMainMenu(phoneNumber, promoter) {
     storeTotals[order.Store_ID] += Number(order.Total_Amount) || 0;
   });
 
-  // Sort stores by total orders for preview
   const sortedStores = [...stores].sort((a, b) => 
     (storeTotals[b.Store_ID] || 0) - (storeTotals[a.Store_ID] || 0)
   );
 
-  // Build response with correct math
   let response = `👋 *${promoter.promoter_name}*, your earnings:\n\n`;
 
-  // Last week
   response += `📆 *LAST WEEK* (${formatDate(lastWeek.start)}-${formatDate(lastWeek.end)})\n`;
   response += `🍳 Total orders: ${formatMoney(lastWeekTotal)}\n`;
   response += `🏪 Hub commission (15%): ${formatMoney(lastWeekHubCommission)}\n`;
   response += `💰 Your 35% of hub commission: ${formatMoney(lastWeekPromoterCommission)} ${lastWeekPromoterCommission > 0 ? '✅' : ''}\n\n`;
 
-  // This week
   response += `📆 *THIS WEEK* (${formatDate(thisWeek.start)}-now)\n`;
   response += `🍳 Total orders: ${formatMoney(thisWeekTotal)} so far\n`;
   response += `🏪 Hub commission (15%): ${formatMoney(thisWeekHubCommission)} so far\n`;
   response += `💰 Your 35% of hub commission: ${formatMoney(thisWeekPromoterCommission)} ${thisWeekPromoterCommission > 0 ? '⏳' : ''}\n\n`;
 
-  // Store preview
   response += `*Your stores this week:*\n`;
   sortedStores.slice(0, 3).forEach(store => {
     const storeTotal = storeTotals[store.Store_ID] || 0;
@@ -252,7 +242,7 @@ async function showMainMenu(phoneNumber, promoter) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show this week details - CORRECTED MATH
+// Show this week details
 async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
   const thisWeek = getWeekRange(new Date());
 
@@ -288,7 +278,6 @@ async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
     return;
   }
 
-  // Calculate payout date (Monday after week ends)
   const payoutDate = new Date(thisWeek.end);
   payoutDate.setDate(payoutDate.getDate() + 3);
 
@@ -308,7 +297,6 @@ async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
     }
   });
 
-  // Show stores with zero orders
   stores.forEach(store => {
     const storeTotal = storeTotals[store.Store_ID] || 0;
     if (storeTotal === 0) {
@@ -326,7 +314,7 @@ async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show last week details - CORRECTED MATH
+// Show last week details
 async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
   const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
 
@@ -361,7 +349,6 @@ async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
     return;
   }
 
-  // Payout date (Monday after week ended)
   const payoutDate = new Date(lastWeek.end);
   payoutDate.setDate(payoutDate.getDate() + 3);
 
@@ -390,7 +377,7 @@ async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show all stores overview - CORRECTED MATH
+// Show all stores overview
 async function showAllStores(phoneNumber, promoter, stores, storeIds) {
   const thisWeek = getWeekRange(new Date());
   const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
@@ -442,7 +429,7 @@ async function showAllStores(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show this month - CORRECTED MATH
+// Show this month
 async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
   const now = new Date();
   const monthRange = getMonthRange(now);
@@ -454,7 +441,6 @@ async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
     .gte('Timestamp', monthRange.start.toISOString())
     .lt('Timestamp', monthRange.end.toISOString());
 
-  // Group by week
   const weekTotals = [0, 0, 0, 0, 0];
   const weekStatus = ['', '', '', '', ''];
 
@@ -466,7 +452,6 @@ async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
     }
   });
 
-  // Determine which weeks are complete
   const currentWeek = Math.floor((now.getDate() - 1) / 7);
 
   for (let i = 0; i < 5; i++) {
@@ -537,8 +522,17 @@ exports.handler = async (event) => {
 
     console.log(`📱 From: ${formattedNumber}, Text: "${messageText}"`);
 
-    // Log this message
-    await logMessage(formattedNumber, messageText, 'incoming');
+    // 🔥 FIX: Define admin number and check if this is a human reply
+    const ADMIN_NUMBER = '+27726515909'; // Your personal number
+    const isHumanReply = formattedNumber === ADMIN_NUMBER;
+
+    // Log message with correct type
+    if (isHumanReply) {
+      await logMessage(formattedNumber, messageText, 'human_reply', 'received');
+      console.log('👤 Human reply recorded - bot will now stay silent for 8 hours');
+    } else {
+      await logMessage(formattedNumber, messageText, 'incoming');
+    }
 
     // Check if a human has EVER replied to this conversation
     const humanReplied = await hasHumanReplied(formattedNumber);
@@ -565,7 +559,6 @@ exports.handler = async (event) => {
       if (command === 'EARNINGS') {
         await showMainMenu(formattedNumber, promoter);
       } else if (['0', '1', '2', '3', '4'].includes(command)) {
-        // Get stores
         const { data: stores } = await supabase
           .from('Stores')
           .select('Store_ID, Name')
@@ -591,7 +584,6 @@ exports.handler = async (event) => {
           await showThisMonth(formattedNumber, promoter, stores, storeIds);
         }
       } else {
-        // Promoter typed something random
         const reminderMsg = `📱 *BEIJU Promoter System*\n\nReply *EARNINGS* to see your earnings.`;
         await sendWasenderMessage(formattedNumber, reminderMsg);
         await logMessage(formattedNumber, reminderMsg, 'auto_response', 'sent');
