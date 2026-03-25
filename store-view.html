@@ -244,6 +244,12 @@
         <p id="description-text" style="font-style: italic;"></p>
       </div>
     </div>
+
+    <div class="location-info">
+  <p id="landmarks-text"></p>
+  <p id="description-text" style="font-style: italic;"></p>
+</div>
+
   </section>
 
   <section class="py-5 bg-light">
@@ -439,6 +445,17 @@
       }
       if (store.Area_Description) {
         document.getElementById('description-text').textContent = store.Area_Description.replace(/"/g, '');
+      }
+
+      // 🔥 ADD THIS RIGHT AFTER THE LANDMARKS/DESCRIPTION CODE
+      if (store.google_maps_link) {
+        document.getElementById('google-maps-container').innerHTML = `
+          <a href="${store.google_maps_link}" target="_blank" class="btn btn-outline-light btn-sm" style="background: var(--brand-red); color: white; border: none; padding: 8px 20px; border-radius: 50px; text-decoration: none; display: inline-block;">
+            🗺️ Open in Google Maps
+          </a>
+        `;
+      } else {
+        document.getElementById('google-maps-container').innerHTML = '';
       }
 
       document.body.dataset.waNumber = store.WhatsApp || '27726515909';
