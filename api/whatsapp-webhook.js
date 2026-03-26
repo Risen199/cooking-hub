@@ -1,4 +1,4 @@
-// netlify/functions/whatsapp-webhook.js
+// api/whatsapp-webhook.js — Vercel version
 const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Supabase
@@ -375,24 +375,36 @@ async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+// Vercel handler
+module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle OPTIONS preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    const payload = JSON.parse(event.body);
+    const payload = req.body;
     console.log('📩 Webhook received');
 
     const message = payload.data?.messages;
     if (!message) {
-      return { statusCode: 200, body: 'OK' };
+      return res.status(200).json({ status: 'OK' });
     }
 
     // Ignore messages sent by the bot
     if (message.key?.fromMe === true) {
       console.log('⏭️ Ignoring own message');
-      return { statusCode: 200, body: 'OK' };
+      return res.status(200).json({ status: 'OK' });
     }
 
     const messageKey = message.key;
@@ -434,7 +446,7 @@ exports.handler = async (event) => {
           .eq('promoter_id', promoter.id);
         if (!stores || stores.length === 0) {
           await sendWasenderMessage(formattedNumber, `👋 ${promoter.promoter_name}\n\nYou have no stores yet.`);
-          return { statusCode: 200, body: 'OK' };
+          return res.status(200).json({ status: 'OK' });
         }
         const storeIds = stores.map(s => s.Store_ID);
         if (command === '0') await showMainMenu(formattedNumber, promoter);
@@ -447,7 +459,7 @@ exports.handler = async (event) => {
         await sendWasenderMessage(formattedNumber, reminderMsg);
         await logMessage(formattedNumber, reminderMsg, 'auto_response', 'sent');
       }
-      return { statusCode: 200, body: 'OK' };
+      return res.status(200).json({ status: 'OK' });
     }
 
     // Random person — receptionist mode
@@ -468,9 +480,9 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 200, body: 'OK' };
+    return res.status(200).json({ status: 'OK' });
   } catch (error) {
     console.error('Webhook error:', error);
-    return { statusCode: 200, body: 'OK' };
+    return res.status(200).json({ status: 'OK' });
   }
 };

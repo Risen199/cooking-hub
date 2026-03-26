@@ -1,4 +1,4 @@
-// netlify/functions/handle-order.js
+// api/handle-order.js — Vercel version
 const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Supabase with environment variables
@@ -50,14 +50,12 @@ async function sendWasenderMessage(to, text) {
 // Function to send auto-response to customer
 async function sendCustomerAutoResponse(customerPhone, storeId, orderDetails) {
   try {
-    // Get store response templates
     const { data: response } = await supabase
       .from('store_responses')
       .select('*')
       .eq('store_id', storeId)
       .single();
 
-    // Get store details
     const { data: store } = await supabase
       .from('Stores')
       .select('Name')
@@ -69,7 +67,6 @@ async function sendCustomerAutoResponse(customerPhone, storeId, orderDetails) {
       
       await sendWasenderMessage(customerPhone, message);
       
-      // Log to wasender_logs
       await supabase.from('wasender_logs').insert([{
         customer_phone: customerPhone,
         store_id: storeId,
@@ -86,7 +83,6 @@ async function sendCustomerAutoResponse(customerPhone, storeId, orderDetails) {
 // Function to forward order to store
 async function forwardOrderToStore(storeId, orderMessage, customerPhone) {
   try {
-    // Get store's real WhatsApp number
     const { data: store } = await supabase
       .from('store_whatsapp')
       .select('real_whatsapp')
@@ -97,7 +93,6 @@ async function forwardOrderToStore(storeId, orderMessage, customerPhone) {
       const message = `🛍️ NEW ORDER\n${orderMessage}\n\nCustomer: ${customerPhone}`;
       await sendWasenderMessage(store.real_whatsapp, message);
       
-      // Log to wasender_logs
       await supabase.from('wasender_logs').insert([{
         customer_phone: customerPhone,
         store_id: storeId,
@@ -111,10 +106,24 @@ async function forwardOrderToStore(storeId, orderMessage, customerPhone) {
   }
 }
 
-exports.handler = async (event) => {
-  const { httpMethod, queryStringParameters, body, headers } = event;
-
+// Vercel handler
+module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle OPTIONS preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   try {
+    const httpMethod = req.method;
+    const queryStringParameters = req.query;
+    const body = req.body;
+    const headers = req.headers;
+
     // GET REQUESTS
     if (httpMethod === 'GET') {
       const action = queryStringParameters?.action;
@@ -133,24 +142,16 @@ exports.handler = async (event) => {
         }
         
         const { data: stores, error } = await query;
-        
         if (error) throw error;
         
-        return {
-          statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ success: true, stores: stores || [] })
-        };
+        return res.status(200).json({ success: true, stores: stores || [] });
       }
 
       // 2. GET MENU
       if (action === 'menu') {
         const storeId = queryStringParameters.storeId;
         if (!storeId) {
-          return { 
-            statusCode: 400, 
-            body: JSON.stringify({ success: false, error: 'Missing storeId' }) 
-          };
+          return res.status(400).json({ success: false, error: 'Missing storeId' });
         }
         
         const { data: menu, error } = await supabase
@@ -160,20 +161,14 @@ exports.handler = async (event) => {
         
         if (error) throw error;
         
-        return { 
-          statusCode: 200, 
-          body: JSON.stringify({ success: true, menu: menu || [] }) 
-        };
+        return res.status(200).json({ success: true, menu: menu || [] });
       }
 
       // 3. SEARCH AREA
       if (action === 'searchArea') {
         const searchTerm = queryStringParameters?.q?.toLowerCase().trim();
         if (!searchTerm) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ success: false, error: 'Missing search term' })
-          };
+          return res.status(400).json({ success: false, error: 'Missing search term' });
         }
 
         const { data: allStores, error } = await supabase
@@ -195,15 +190,9 @@ exports.handler = async (event) => {
         }
 
         if (foundTownshipCode) {
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ success: true, townshipCode: foundTownshipCode })
-          };
+          return res.status(200).json({ success: true, townshipCode: foundTownshipCode });
         } else {
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ success: false, message: 'Area not found' })
-          };
+          return res.status(200).json({ success: false, message: 'Area not found' });
         }
       }
 
@@ -211,10 +200,7 @@ exports.handler = async (event) => {
       if (action === 'getHub') {
         const townshipCode = queryStringParameters?.township;
         if (!townshipCode) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ success: false, error: 'Missing township code' })
-          };
+          return res.status(400).json({ success: false, error: 'Missing township code' });
         }
 
         const { data: hubs, error } = await supabase
@@ -226,15 +212,9 @@ exports.handler = async (event) => {
         if (error) throw error;
         
         if (hubs && hubs.length > 0) {
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ success: true, hub: hubs[0] })
-          };
+          return res.status(200).json({ success: true, hub: hubs[0] });
         } else {
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ success: false, error: 'Hub not found' })
-          };
+          return res.status(200).json({ success: false, error: 'Hub not found' });
         }
       }
 
@@ -247,20 +227,14 @@ exports.handler = async (event) => {
         
         if (error) throw error;
         
-        return {
-          statusCode: 200,
-          body: JSON.stringify({ success: true, hubs: hubs || [] })
-        };
+        return res.status(200).json({ success: true, hubs: hubs || [] });
       }
 
       // 6. GET HUB BY SLUG
       if (action === 'getHubBySlug') {
         const slug = queryStringParameters?.slug;
         if (!slug) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ success: false, error: 'Missing slug' })
-          };
+          return res.status(400).json({ success: false, error: 'Missing slug' });
         }
 
         const { data: hubs, error } = await supabase
@@ -272,22 +246,16 @@ exports.handler = async (event) => {
         if (error) throw error;
         
         if (hubs && hubs.length > 0) {
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ success: true, hub: hubs[0] })
-          };
+          return res.status(200).json({ success: true, hub: hubs[0] });
         } else {
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ success: false, error: 'Hub not found' })
-          };
+          return res.status(200).json({ success: false, error: 'Hub not found' });
         }
       }
     }
 
     // POST REQUESTS
     if (httpMethod === 'POST') {
-      const data = JSON.parse(body);
+      const data = body;
 
       // LOG HEATMAP SEARCH
       if (data.action === 'logHeatmap') {
@@ -304,21 +272,16 @@ exports.handler = async (event) => {
           console.error('Heatmap insert error:', error);
         }
         
-        return { 
-          statusCode: 200, 
-          body: JSON.stringify({ success: true }) 
-        };
+        return res.status(200).json({ success: true });
       }
 
-      // CREATE ORDER - WITH POPIA AND WASENDERAPI INTEGRATION
+      // CREATE ORDER
       if (data.action === 'order') {
-        // Get IP address from headers
         const ipAddress = headers['x-forwarded-for'] || headers['client-ip'] || 'unknown';
         const userAgent = headers['user-agent'] || 'unknown';
         
-        const waNumber = (data.waNumber || '27638716816').replace(/\D/g, ''); // Your central number
+        const waNumber = (data.waNumber || '27638716816').replace(/\D/g, '');
         
-        // Format order message with Store ID for WasenderAPI
         const orderMessage = `[${data.Store_ID}] ORDER FOR: ${data.Customer_Name || 'Customer'}\nPhone: ${data.Customer_Phone || 'Not provided'}\n${data.Order_Items || 'No items'}\nTotal: R${(data.Total_Amount || 0).toFixed(2)}\n\nPickup window: ${data.Pickup_Window || 'ASAP'}`;
 
         const totalAmount = Number(data.Total_Amount) || 0;
@@ -327,7 +290,7 @@ exports.handler = async (event) => {
         const companyCommission = Number((commissionPool * 0.65).toFixed(2));
 
         // 1. Insert into Messages table
-        const { error: messagesError } = await supabase
+        await supabase
           .from('Messages')
           .insert([{
             Message_ID: 'msg_' + Date.now(),
@@ -345,12 +308,8 @@ exports.handler = async (event) => {
             Source: 'Website'
           }]);
 
-        if (messagesError) {
-          console.error('Messages insert error:', messagesError);
-        }
-
         // 2. Insert into Consent_Logs table
-        const { error: consentError } = await supabase
+        await supabase
           .from('consent_logs')
           .insert([{
             customer_name: data.Customer_Name || 'Customer',
@@ -367,12 +326,8 @@ exports.handler = async (event) => {
             forwarded_to_store: false
           }]);
 
-        if (consentError) {
-          console.error('consent_logs insert error:', consentError);
-        }
-
         // 3. Send via WasenderAPI to central number
-        const wasenderResult = await sendWasenderMessage(waNumber, orderMessage);
+        await sendWasenderMessage(waNumber, orderMessage);
         
         // 4. Send auto-response to customer
         if (data.Customer_Phone && data.Customer_Phone !== 'Not provided') {
@@ -386,28 +341,18 @@ exports.handler = async (event) => {
         // 5. Forward to store silently
         await forwardOrderToStore(data.Store_ID, orderMessage, data.Customer_Phone);
 
-        // 6. Return success (no WhatsApp link needed anymore)
-        return { 
-          statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            success: true,
-            message: 'Order processed with WasenderAPI'
-          }) 
-        };
+        // 6. Return success
+        return res.status(200).json({ 
+          success: true,
+          message: 'Order processed with WasenderAPI'
+        });
       }
     }
 
-    return { 
-      statusCode: 405, 
-      body: JSON.stringify({ success: false, error: 'Method not allowed' }) 
-    };
-
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    
   } catch (err) {
     console.error('Function error:', err);
-    return { 
-      statusCode: 500, 
-      body: JSON.stringify({ success: false, error: err.message }) 
-    };
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
