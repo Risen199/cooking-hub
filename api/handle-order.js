@@ -2,10 +2,12 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Supabase with environment variables
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+if (action === 'test') {
+  return res.status(200).json({ message: 'Function is working', env: {
+    supabase_url: !!process.env.SUPABASE_URL,
+    supabase_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  }});
+}
 
 // Helper function for South African timestamp
 const getSATimestamp = () => {
