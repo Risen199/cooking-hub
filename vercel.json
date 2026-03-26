@@ -1,4 +1,10 @@
 {
+  "builds": [
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    }
+  ],
   "rewrites": [
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
