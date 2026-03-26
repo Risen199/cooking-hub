@@ -1,5 +1,5 @@
 {
-  "redirects": [
+  "rewrites": [
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
     { "source": "/mama-lerato", "destination": "/store-view.html?storeId=bdp_02" },
