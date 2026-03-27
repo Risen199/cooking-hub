@@ -191,11 +191,16 @@ const API_URL = '/api/handle-order';
 const getHubSlug = (townshipCode) => {
   const slugMap = {
     'BLB': 'Blouberg',
-    'BDP': 'bedworthpark',
+    'BDP': 'Bedworthpark',
     'MAN': 'Mankweng',
     'SES': 'seshego',
     'VDK': 'Vanderbijlpark',
-    'VAL': 'VAAL'
+    'VAL': 'VAAL',
+    'SMU': 'smu',
+    'THO': 'thoyandou',
+    'SWT': 'soweto',
+    'MKN': 'mokopane',
+    'TEM': 'tembisa'
   };
   return slugMap[townshipCode] || townshipCode;
 };
