@@ -1,4 +1,4 @@
-// api/whatsapp-webhook.js — Vercel version
+// api/whatsapp-webhook.js — Vercel version with Cook Dashboard + Promoter Dashboard
 const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Supabase
@@ -81,7 +81,182 @@ function extractPhoneNumber(messageKey) {
   return phoneNumber;
 }
 
-// Check if human has ever replied
+// ========== COOK FUNCTIONS ==========
+async function getCookStore(phoneNumber) {
+  const cleanPhone = phoneNumber.replace(/\D/g, '');
+  const { data } = await supabase
+    .from('Stores')
+    .select('Store_ID, Name')
+    .eq('WhatsApp', cleanPhone)
+    .maybeSingle();
+  return data;
+}
+
+async function getTodayOrders(storeId) {
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await supabase
+    .from('Messages')
+    .select('Order_Items, Total_Amount, Pickup_Window, Timestamp')
+    .eq('Store_ID', storeId)
+    .gte('Timestamp', `${today}T00:00:00`)
+    .lt('Timestamp', `${today}T23:59:59`)
+    .order('Timestamp', { ascending: true });
+  return data || [];
+}
+
+async function getEarnings(storeId, startDate, endDate) {
+  const { data } = await supabase
+    .from('Messages')
+    .select('Total_Amount')
+    .eq('Store_ID', storeId)
+    .gte('Timestamp', startDate)
+    .lt('Timestamp', endDate);
+  
+  const total = (data || []).reduce((sum, o) => sum + Number(o.Total_Amount), 0);
+  return { total, cookShare: total * 0.85 };
+}
+
+async function getDailyBreakdown(storeId, startDate, endDate) {
+  const { data } = await supabase
+    .from('Messages')
+    .select('Total_Amount, Timestamp')
+    .eq('Store_ID', storeId)
+    .gte('Timestamp', startDate)
+    .lt('Timestamp', endDate);
+  
+  const daily = {};
+  (data || []).forEach(order => {
+    const day = new Date(order.Timestamp).toLocaleDateString('en-ZA', { weekday: 'short' });
+    daily[day] = (daily[day] || 0) + Number(order.Total_Amount);
+  });
+  return daily;
+}
+
+function formatOrders(orders, storeName) {
+  if (orders.length === 0) {
+    return `👩‍🍳 ${storeName}, you have no orders today.`;
+  }
+  
+  let total = 0;
+  let message = `👩‍🍳 ${storeName}, your orders today:\n\n`;
+  
+  orders.forEach(order => {
+    const time = new Date(order.Timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    message += `🕘 ${time} — ${order.Order_Items}\n`;
+    total += Number(order.Total_Amount);
+  });
+  
+  const cookShare = total * 0.85;
+  message += `\n💰 Total: ${formatMoney(total)}\n💵 Your 85%: ${formatMoney(cookShare)}`;
+  
+  return message;
+}
+
+async function showCookMainMenu(phoneNumber, store) {
+  const todayOrders = await getTodayOrders(store.Store_ID);
+  const todayTotal = todayOrders.reduce((sum, o) => sum + Number(o.Total_Amount), 0);
+  const todayShare = todayTotal * 0.85;
+  
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0,0,0,0);
+  const weekEarnings = await getEarnings(store.Store_ID, startOfWeek.toISOString(), now.toISOString());
+  
+  let response = `👩‍🍳 *${store.Name}*, your dashboard:\n\n`;
+  response += `📆 Today: ${todayOrders.length} orders | ${formatMoney(todayTotal)} (your 85% = ${formatMoney(todayShare)})\n`;
+  response += `💰 This week: ${formatMoney(weekEarnings.total)} (your 85% = ${formatMoney(weekEarnings.cookShare)})\n\n`;
+  response += `📋 *Reply with number:*\n`;
+  response += `1️⃣ Today's orders (detailed)\n`;
+  response += `2️⃣ This week earnings\n`;
+  response += `3️⃣ Last week earnings\n`;
+  response += `4️⃣ Last 2 weeks\n`;
+  response += `5️⃣ This month\n`;
+  response += `0️⃣ Help / main menu`;
+  
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+async function showTodayOrders(phoneNumber, store) {
+  const orders = await getTodayOrders(store.Store_ID);
+  const message = formatOrders(orders, store.Name);
+  await sendWasenderMessage(phoneNumber, message + `\n\n0️⃣ Back to main menu`);
+}
+
+async function showThisWeekEarnings(phoneNumber, store) {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0,0,0,0);
+  
+  const earnings = await getEarnings(store.Store_ID, startOfWeek.toISOString(), now.toISOString());
+  const daily = await getDailyBreakdown(store.Store_ID, startOfWeek.toISOString(), now.toISOString());
+  
+  let response = `📆 *THIS WEEK* (${startOfWeek.toLocaleDateString()} - ${now.toLocaleDateString()})\n\n`;
+  response += `💰 Total orders: ${formatMoney(earnings.total)}\n`;
+  response += `💵 Your 85%: ${formatMoney(earnings.cookShare)}\n\n`;
+  response += `📊 Daily:\n`;
+  
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  days.forEach(day => {
+    const amount = daily[day] || 0;
+    response += `${day}: ${formatMoney(amount)}\n`;
+  });
+  
+  response += `\n0️⃣ Back to main menu`;
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+async function showLastWeekEarnings(phoneNumber, store) {
+  const now = new Date();
+  const endOfLastWeek = new Date(now);
+  endOfLastWeek.setDate(now.getDate() - now.getDay());
+  endOfLastWeek.setHours(0,0,0,0);
+  
+  const startOfLastWeek = new Date(endOfLastWeek);
+  startOfLastWeek.setDate(endOfLastWeek.getDate() - 7);
+  
+  const earnings = await getEarnings(store.Store_ID, startOfLastWeek.toISOString(), endOfLastWeek.toISOString());
+  
+  let response = `📆 *LAST WEEK* (${startOfLastWeek.toLocaleDateString()} - ${endOfLastWeek.toLocaleDateString()})\n\n`;
+  response += `💰 Total orders: ${formatMoney(earnings.total)}\n`;
+  response += `💵 Your 85%: ${formatMoney(earnings.cookShare)}\n\n`;
+  response += `0️⃣ Back to main menu`;
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+async function showLastTwoWeeksEarnings(phoneNumber, store) {
+  const now = new Date();
+  const endDate = new Date(now);
+  endDate.setDate(now.getDate() - now.getDay());
+  endDate.setHours(0,0,0,0);
+  
+  const startDate = new Date(endDate);
+  startDate.setDate(endDate.getDate() - 14);
+  
+  const earnings = await getEarnings(store.Store_ID, startDate.toISOString(), endDate.toISOString());
+  
+  let response = `📆 *LAST 2 WEEKS* (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})\n\n`;
+  response += `💰 Total orders: ${formatMoney(earnings.total)}\n`;
+  response += `💵 Your 85%: ${formatMoney(earnings.cookShare)}\n\n`;
+  response += `0️⃣ Back to main menu`;
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+async function showThisMonthEarnings(phoneNumber, store) {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  
+  const earnings = await getEarnings(store.Store_ID, startOfMonth.toISOString(), now.toISOString());
+  
+  let response = `📆 *THIS MONTH* (${startOfMonth.toLocaleDateString()} - ${now.toLocaleDateString()})\n\n`;
+  response += `💰 Total orders: ${formatMoney(earnings.total)}\n`;
+  response += `💵 Your 85%: ${formatMoney(earnings.cookShare)}\n\n`;
+  response += `0️⃣ Back to main menu`;
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+// ========== PROMOTER FUNCTIONS ==========
 async function hasHumanReplied(phoneNumber) {
   try {
     const { data } = await supabase
@@ -97,7 +272,6 @@ async function hasHumanReplied(phoneNumber) {
   }
 }
 
-// Check if conversation within 8-hour window
 async function isWithinActiveWindow(phoneNumber) {
   try {
     const { data } = await supabase
@@ -116,7 +290,6 @@ async function isWithinActiveWindow(phoneNumber) {
   }
 }
 
-// Log message to wasender_logs
 async function logMessage(phoneNumber, messageText, messageType, status = 'received') {
   try {
     await supabase.from('wasender_logs').insert([{
@@ -131,7 +304,6 @@ async function logMessage(phoneNumber, messageText, messageType, status = 'recei
   }
 }
 
-// Show main menu
 async function showMainMenu(phoneNumber, promoter) {
   const { data: stores } = await supabase
     .from('Stores')
@@ -203,8 +375,7 @@ async function showMainMenu(phoneNumber, promoter) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show this week details
-async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
+async function showThisWeekDetails(phoneNumber, promoter, stores, storeIds) {
   const thisWeek = getWeekRange(new Date());
   const { data: orders } = await supabase
     .from('Messages')
@@ -251,8 +422,7 @@ async function showThisWeek(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show last week details
-async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
+async function showLastWeekDetails(phoneNumber, promoter, stores, storeIds) {
   const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
   const { data: orders } = await supabase
     .from('Messages')
@@ -296,7 +466,6 @@ async function showLastWeek(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show all stores overview
 async function showAllStores(phoneNumber, promoter, stores, storeIds) {
   const thisWeek = getWeekRange(new Date());
   const lastWeek = getWeekRange(new Date(Date.now() - 7 * 86400000));
@@ -327,8 +496,7 @@ async function showAllStores(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Show this month
-async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
+async function showThisMonthDetails(phoneNumber, promoter, stores, storeIds) {
   const now = new Date();
   const monthRange = getMonthRange(now);
   const { data: orders } = await supabase
@@ -375,19 +543,16 @@ async function showThisMonth(phoneNumber, promoter, stores, storeIds) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-// Vercel handler
+// ========== VERCEL HANDLER ==========
 module.exports = async (req, res) => {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  // Handle OPTIONS preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
-  // Only accept POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -401,7 +566,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ status: 'OK' });
     }
 
-    // Ignore messages sent by the bot
     if (message.key?.fromMe === true) {
       console.log('⏭️ Ignoring own message');
       return res.status(200).json({ status: 'OK' });
@@ -415,10 +579,9 @@ module.exports = async (req, res) => {
     const ADMIN_NUMBER = '+27726515909';
     const isHumanReply = formattedNumber === ADMIN_NUMBER;
 
-    // Log message with correct type
     if (isHumanReply) {
       await logMessage(formattedNumber, messageText, 'human_reply', 'received');
-      console.log('👤 Human reply recorded - bot will now stay silent for 8 hours');
+      console.log('👤 Human reply recorded');
     } else {
       await logMessage(formattedNumber, messageText, 'incoming');
     }
@@ -427,7 +590,32 @@ module.exports = async (req, res) => {
     const withinWindow = await isWithinActiveWindow(formattedNumber);
     const command = messageText.toUpperCase().trim();
 
-    // Check if sender is a promoter
+    // ========== COOK DASHBOARD ==========
+    const cookStore = await getCookStore(formattedNumber);
+    
+    if (cookStore) {
+      console.log(`👩‍🍳 Cook detected: ${cookStore.Name}`);
+      
+      if (command === 'DASHBOARD' || command === '0') {
+        await showCookMainMenu(formattedNumber, cookStore);
+      } else if (command === '1') {
+        await showTodayOrders(formattedNumber, cookStore);
+      } else if (command === '2') {
+        await showThisWeekEarnings(formattedNumber, cookStore);
+      } else if (command === '3') {
+        await showLastWeekEarnings(formattedNumber, cookStore);
+      } else if (command === '4') {
+        await showLastTwoWeeksEarnings(formattedNumber, cookStore);
+      } else if (command === '5') {
+        await showThisMonthEarnings(formattedNumber, cookStore);
+      } else {
+        await sendWasenderMessage(formattedNumber, 
+          `👩‍🍳 *${cookStore.Name}*\n\nReply *DASHBOARD* to see your earnings and orders.\n\nCommands:\n1️⃣ Today's orders\n2️⃣ This week\n3️⃣ Last week\n4️⃣ Last 2 weeks\n5️⃣ This month\n0️⃣ Main menu`);
+      }
+      return res.status(200).json({ status: 'OK' });
+    }
+
+    // ========== PROMOTER DASHBOARD ==========
     const { data: promoter } = await supabase
       .from('promoters')
       .select('*')
@@ -435,8 +623,8 @@ module.exports = async (req, res) => {
       .maybeSingle();
 
     if (promoter) {
-      console.log('✅ Promoter detected - showing earnings menu');
-
+      console.log('✅ Promoter detected');
+      
       if (command === 'EARNINGS') {
         await showMainMenu(formattedNumber, promoter);
       } else if (['0', '1', '2', '3', '4'].includes(command)) {
@@ -450,10 +638,10 @@ module.exports = async (req, res) => {
         }
         const storeIds = stores.map(s => s.Store_ID);
         if (command === '0') await showMainMenu(formattedNumber, promoter);
-        else if (command === '1') await showThisWeek(formattedNumber, promoter, stores, storeIds);
-        else if (command === '2') await showLastWeek(formattedNumber, promoter, stores, storeIds);
+        else if (command === '1') await showThisWeekDetails(formattedNumber, promoter, stores, storeIds);
+        else if (command === '2') await showLastWeekDetails(formattedNumber, promoter, stores, storeIds);
         else if (command === '3') await showAllStores(formattedNumber, promoter, stores, storeIds);
-        else if (command === '4') await showThisMonth(formattedNumber, promoter, stores, storeIds);
+        else if (command === '4') await showThisMonthDetails(formattedNumber, promoter, stores, storeIds);
       } else {
         const reminderMsg = `📱 *BEIJU Promoter System*\n\nReply *EARNINGS* to see your earnings.`;
         await sendWasenderMessage(formattedNumber, reminderMsg);
@@ -462,7 +650,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ status: 'OK' });
     }
 
-    // Random person — receptionist mode
+    // ========== RANDOM PERSON — RECEPTIONIST MODE ==========
     console.log('👤 Random person - applying receptionist logic');
     const autoReply = `Thank you for contacting BEIJU.\n\nOne of our team will respond within 8 hours. If you don't hear back, just message again and we'll get right to you.\n\nFor support: beiju.enquiries@gmail.com\n\n🇿 Beiju.co.za`;
 
