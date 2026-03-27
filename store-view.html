@@ -368,15 +368,22 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    // Get storeId from URL params (old way)
+    // Get info from URL — supports both clean URLs and query params
     const urlParams = new URLSearchParams(window.location.search);
-    const storeId = urlParams.get('storeId');
-    const from = urlParams.get('from');
-    const township = urlParams.get('township');
-    
-    // Get clean slug from URL path (new way)
+    let storeId = urlParams.get('storeId');
+    let from = urlParams.get('from');
+    let township = urlParams.get('township');
+
+    // Get clean slug from URL path (e.g., /aunty-thandi)
     let path = window.location.pathname;
     let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
+
+    // If no storeId in query string, try to get it from the slug
+    if (!storeId && cleanSlug && cleanSlug !== 'store-view.html' && cleanSlug !== 'hub.html' && cleanSlug !== '') {
+      // We'll need to look up the store by slug
+      // For now, storeId will be found when we load stores below
+      console.log('🔍 Looking up store by slug:', cleanSlug);
+    }
     
     try {
       // Load all stores
