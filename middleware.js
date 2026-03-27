@@ -56,19 +56,27 @@ export function middleware(request) {
     '/mama-venda': 'tho_01',
     '/sis-tshifhiwa': 'tho_02',
     '/chef-mukhethwa': 'tho_03',
-    '/aunty-mulalo': 'tho_04'
+    '/aunty-mulalo': 'tho_04',
+    '/chef-cheezy': 'smu_01',
+    '/mama-rose-smu': 'smu_02',
+    '/sis-tumi-smu': 'smu_03'
   };
   
   // Hub redirects
-  const hubMap = {
+    const hubMap = {
     '/VAAL': 'VAL',
     '/Blouberg': 'BLB',
-    '/bedworthpark': 'BDP',
+    '/Bedworthpark': 'BDP',
     '/Mankweng': 'MAN',
     '/seshego': 'SES',
-    '/Vanderbijlpark': 'VDK'
+    '/Vanderbijlpark': 'VDK',
+    '/smu': 'SMU',
+    '/thoyandou': 'THO',
+    '/soweto': 'SWT',
+    '/mokopane': 'MKN',
+    '/tembisa': 'TEM'
   };
-  
+    
   // If it's a store slug
   if (storeMap[path]) {
     const storeId = storeMap[path];
