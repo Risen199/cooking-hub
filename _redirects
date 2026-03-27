@@ -1,0 +1,17 @@
+# Hubs
+/smu                  /hub.html?township=SMU          200
+/thohoyandou          /hub.html?township=THO          200
+/soweto               /hub.html?township=SWT          200
+/mokopane             /hub.html?township=MKN          200
+/tembisa              /hub.html?township=TEM          200
+/VAAL                 /hub.html?township=VAL          200
+/Blouberg             /hub.html?township=BLB          200
+/Bedworthpark         /hub.html?township=BDP          200
+/Mankweng             /hub.html?township=MAN          200
+/seshego              /hub.html?township=SES          200
+/Vanderbijlpark       /hub.html?township=VDK          200
+
+# Store redirects
+/aunty-thandi         /store-view.html?storeId=blb_01    200
+/chef-cheezy          /store-view.html?storeId=smu_01    200
+# Add your other store slugs here
