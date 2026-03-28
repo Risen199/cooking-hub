@@ -819,7 +819,7 @@
                 Total_Amount: total,
                 Pickup_Window: selectedTime
               });
-              
+
                   const orderResponse = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -843,6 +843,15 @@
                   const orderData = await orderResponse.json();
                   
                   if (orderData.success && orderData.orderId) {
+
+                     // 🔥 ADD DEBUG LOG HERE
+              console.log('🔧 Calling createStitchPayment with:', {
+                orderId: orderData.orderId,
+                total: total,
+                phone: internationalPhone,
+                email: 'customer@example.com'
+              });
+
                     // Create Stitch payment link
                     const stitchResult = await createStitchPayment(
                       orderData.orderId,
