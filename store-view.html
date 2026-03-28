@@ -449,7 +449,8 @@
           orderId: orderId,
           amount: amount,
           customerPhone: customerPhone,
-          customerEmail: customerEmail
+          customerEmail: customerEmail,
+          customerName: customerName
         })
       });
       const data = await response.json();
@@ -851,7 +852,8 @@
                 orderId: orderData.orderId,
                 total: total,
                 phone: internationalPhone,
-                email: 'customer@example.com'
+                email: 'customer@example.com',
+                name: name
               });
 
                     // Create Stitch payment link
@@ -859,7 +861,8 @@
                       orderData.orderId,
                       total,
                       internationalPhone,
-                      'customer@example.com' // You can collect email if needed
+                      'customer@example.com', // You can collect email if needed
+                      name
                     );
                     
                     if (stitchResult.success && stitchResult.url) {
