@@ -440,7 +440,7 @@
   }
 
   // Create Stitch payment link
-  async function createStitchPayment(orderId, amount, customerPhone, customerEmail) {
+  async function createStitchPayment(orderId, amount, customerPhone, customerEmail, customerName) {
     try {
       const response = await fetch('/api/stitch-client', {
         method: 'POST',
