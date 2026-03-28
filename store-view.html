@@ -820,31 +820,31 @@
                 Pickup_Window: selectedTime
               });
 
-                  const orderResponse = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      action: 'order',
-                      Store_ID: store.Store_ID,
-                      Customer_Name: name,
-                      Customer_Phone: internationalPhone,
-                      Order_Items: lines.join('|'),
-                      Total_Amount: total,
-                      Pickup_Window: selectedTime,
-                      Delivery_Type: 'Collection',
-                      waNumber: document.body.dataset.waNumber,
-                      consentGiven: true,
-                      consentTimestamp: new Date().toISOString(),
-                      payment_method: 'bank',
-                      payment_status: 'pending'
-                    })
-                  });
-                  
-                  const orderData = await orderResponse.json();
-                  console.log('📦 Order data from API:', orderData);
-                  console.log('📦 orderId value:', orderData.orderId);
-                  
-                  if (orderData.success && orderData.orderId) {
+              const orderResponse = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'order',
+                  Store_ID: store.Store_ID,
+                  Customer_Name: name,
+                  Customer_Phone: internationalPhone,
+                  Order_Items: lines.join('|'),
+                  Total_Amount: total,
+                  Pickup_Window: selectedTime,
+                  Delivery_Type: 'Collection',
+                  waNumber: document.body.dataset.waNumber,
+                  consentGiven: true,
+                  consentTimestamp: new Date().toISOString(),
+                  payment_method: 'bank',
+                  payment_status: 'pending'
+                })
+              });
+
+              const orderData = await orderResponse.json();
+              console.log('📦 Order data from API:', orderData);
+              console.log('📦 orderId value:', orderData.orderId);
+
+              if (orderData.success && orderData.orderId) {
 
                      // 🔥 ADD DEBUG LOG HERE
               console.log('🔧 Calling createStitchPayment with:', {
