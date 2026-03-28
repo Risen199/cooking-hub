@@ -9,7 +9,7 @@ async function getCookStore(phoneNumber) {
   const cleanPhone = phoneNumber.replace(/\D/g, '');
   const { data } = await supabase
     .from('Stores')
-    .select('Store_ID, Name')
+    .select('Store_ID, Name, Temporarily_Closed')
     .eq('WhatsApp', cleanPhone)
     .maybeSingle();
   return data;
@@ -69,11 +69,13 @@ function formatOrders(orders, storeName) {
   return message;
 }
 
-// Store Settings Menu
+// Store Settings Menu — ONLY open/close options
 async function showStoreSettings(phoneNumber, store) {
+  console.log(`⚙️ Showing store settings for ${store.Name}`);
   userSessions[phoneNumber] = { state: 'store_settings' };
+  const statusText = store.Temporarily_Closed ? '🔴 CLOSED' : '🟢 OPEN';
   const response = `⚙️ *Store Settings* — ${store.Name}\n\n` +
-    `Current status: ${store.Temporarily_Closed ? '🔴 CLOSED' : '🟢 OPEN'}\n\n` +
+    `Current status: ${statusText}\n\n` +
     `1️⃣ Open Store\n` +
     `2️⃣ Close Store\n` +
     `0️⃣ Back to main menu`;
@@ -82,6 +84,7 @@ async function showStoreSettings(phoneNumber, store) {
 
 // Ask for confirmation before changing store status
 async function askConfirmation(phoneNumber, store, action) {
+  console.log(`❓ Asking confirmation for ${action} on ${store.Name}`);
   userSessions[phoneNumber] = { state: 'confirm_action', action: action };
   const actionText = action === 'open' ? 'OPEN' : 'CLOSE';
   const confirmMsg = `⚠️ Are you sure you want to ${actionText} your store?\n\n` +
@@ -91,24 +94,36 @@ async function askConfirmation(phoneNumber, store, action) {
   await sendWasenderMessage(phoneNumber, confirmMsg);
 }
 
-// Execute the store status change
+// Execute the store status change with logging
 async function executeStoreAction(phoneNumber, store, action) {
+  console.log(`🔧 executeStoreAction called: phone=${phoneNumber}, store=${store.Store_ID}, action=${action}`);
+  
   const isOpen = action === 'open';
-  await supabase
+  console.log(`📝 Updating Temporarily_Closed to ${!isOpen}`);
+  
+  const { error } = await supabase
     .from('Stores')
     .update({ Temporarily_Closed: !isOpen })
     .eq('Store_ID', store.Store_ID);
   
+  if (error) {
+    console.error('❌ Database error:', error);
+    await sendWasenderMessage(phoneNumber, `Error: ${error.message}`);
+    return;
+  }
+  
+  console.log('✅ Database updated successfully');
+  
   const statusMsg = isOpen ? 'OPEN' : 'CLOSED';
   const emoji = isOpen ? '🟢' : '🔴';
-  await sendWasenderMessage(phoneNumber, `${emoji} ${store.Name} is now ${statusMSG}.\n\n0️⃣ Back to main menu`);
+  await sendWasenderMessage(phoneNumber, `${emoji} ${store.Name} is now ${statusMsg}.\n\n0️⃣ Back to main menu`);
   
-  // Clear session
   delete userSessions[phoneNumber];
 }
 
 // Show main menu with option 6
 async function showCookMainMenu(phoneNumber, store) {
+  console.log(`📊 Showing main menu for ${store.Name}`);
   const todayOrders = await getTodayOrders(store.Store_ID);
   const todayTotal = todayOrders.reduce((sum, o) => sum + Number(o.Total_Amount), 0);
   const todayShare = todayTotal * 0.85;
@@ -209,6 +224,8 @@ async function showThisMonthEarnings(phoneNumber, store) {
 // Handle menu navigation for cooks
 async function handleCookMenu(phoneNumber, command, store) {
   const session = userSessions[phoneNumber];
+  
+  console.log(`🎮 Menu navigation: phone=${phoneNumber}, command=${command}, session=${session?.state}`);
   
   // Handle store settings menu
   if (session?.state === 'store_settings') {
