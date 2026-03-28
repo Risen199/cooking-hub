@@ -15,12 +15,13 @@ module.exports = async (req, res) => {
   }
   
   try {
-    const { orderId, amount, customerPhone, customerEmail } = req.body;
+    const { orderId, amount, customerPhone, customerEmail, customerName } = req.body;
     
-    if (!orderId || !amount || !customerPhone) {
+    // ✅ Updated validation - check all required fields
+    if (!orderId || !amount || !customerPhone || !customerName) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing required fields' 
+        error: 'Missing required fields: orderId, amount, customerPhone, and customerName are required' 
       });
     }
     
@@ -53,7 +54,7 @@ module.exports = async (req, res) => {
     const accessToken = tokenData.data.accessToken;
     console.log('✅ Stitch token obtained');
     
-    // Step 2: Create payment link
+    // Step 2: Create payment link with required fields
     console.log('🔧 Creating payment link for order:', orderId);
     
     const paymentResponse = await fetch(`${STITCH_API}/api/v1/payment-links`, {
@@ -63,15 +64,15 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        amount: Math.round(amount * 100), // in cents
+        amount: Math.round(amount * 100),
         currency: 'ZAR',
-        reference: orderId,
+        merchantReference: orderId,
         returnUrl: 'https://beiju.co.za/order-confirmation',
         cancelUrl: 'https://beiju.co.za/checkout',
-        customer: {
-          phone: formattedPhone,
-          email: customerEmail || 'customer@beiju.co.za'
-        }
+        payerName: customerName,
+        payerEmail: customerEmail || 'customer@beiju.co.za',
+        payerPhone: formattedPhone,
+        description: `Order ${orderId} from BEIJU`
       })
     });
     
@@ -81,7 +82,9 @@ module.exports = async (req, res) => {
       console.error('❌ Stitch API error:', paymentData);
       return res.status(200).json({ 
         success: false, 
-        error: paymentData.message || 'Payment creation failed' 
+        error: paymentData.fieldErrors ? 
+          `Missing: ${Object.keys(paymentData.fieldErrors).join(', ')}` : 
+          paymentData.message || 'Payment creation failed' 
       });
     }
     
