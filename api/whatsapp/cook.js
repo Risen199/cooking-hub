@@ -1,6 +1,9 @@
 // api/whatsapp/cook.js
 const { supabase, sendWasenderMessage, getWeekRange, formatMoney, formatDate } = require('./utils');
 
+// Track user session state (which menu they're in)
+const userSessions = {};
+
 // Get cook's store by phone number
 async function getCookStore(phoneNumber) {
   const cleanPhone = phoneNumber.replace(/\D/g, '');
@@ -66,6 +69,45 @@ function formatOrders(orders, storeName) {
   return message;
 }
 
+// Store Settings Menu
+async function showStoreSettings(phoneNumber, store) {
+  userSessions[phoneNumber] = { state: 'store_settings' };
+  const response = `⚙️ *Store Settings* — ${store.Name}\n\n` +
+    `Current status: ${store.Temporarily_Closed ? '🔴 CLOSED' : '🟢 OPEN'}\n\n` +
+    `1️⃣ Open Store\n` +
+    `2️⃣ Close Store\n` +
+    `0️⃣ Back to main menu`;
+  await sendWasenderMessage(phoneNumber, response);
+}
+
+// Ask for confirmation before changing store status
+async function askConfirmation(phoneNumber, store, action) {
+  userSessions[phoneNumber] = { state: 'confirm_action', action: action };
+  const actionText = action === 'open' ? 'OPEN' : 'CLOSE';
+  const confirmMsg = `⚠️ Are you sure you want to ${actionText} your store?\n\n` +
+    `1️⃣ Yes, confirm\n` +
+    `2️⃣ No, cancel\n` +
+    `0️⃣ Back`;
+  await sendWasenderMessage(phoneNumber, confirmMsg);
+}
+
+// Execute the store status change
+async function executeStoreAction(phoneNumber, store, action) {
+  const isOpen = action === 'open';
+  await supabase
+    .from('Stores')
+    .update({ Temporarily_Closed: !isOpen })
+    .eq('Store_ID', store.Store_ID);
+  
+  const statusMsg = isOpen ? 'OPEN' : 'CLOSED';
+  const emoji = isOpen ? '🟢' : '🔴';
+  await sendWasenderMessage(phoneNumber, `${emoji} ${store.Name} is now ${statusMSG}.\n\n0️⃣ Back to main menu`);
+  
+  // Clear session
+  delete userSessions[phoneNumber];
+}
+
+// Show main menu with option 6
 async function showCookMainMenu(phoneNumber, store) {
   const todayOrders = await getTodayOrders(store.Store_ID);
   const todayTotal = todayOrders.reduce((sum, o) => sum + Number(o.Total_Amount), 0);
@@ -86,6 +128,7 @@ async function showCookMainMenu(phoneNumber, store) {
   response += `3️⃣ Last week earnings\n`;
   response += `4️⃣ Last 2 weeks\n`;
   response += `5️⃣ This month\n`;
+  response += `6️⃣ Store Settings\n`;
   response += `0️⃣ Help / main menu`;
   
   await sendWasenderMessage(phoneNumber, response);
@@ -163,23 +206,66 @@ async function showThisMonthEarnings(phoneNumber, store) {
   await sendWasenderMessage(phoneNumber, response);
 }
 
-async function handleCloseStore(phoneNumber, store) {
-  await supabase.from('Stores').update({ Temporarily_Closed: true }).eq('Store_ID', store.Store_ID);
-  await sendWasenderMessage(phoneNumber, `👩‍🍳 ${store.Name}, your store is now CLOSED. No new orders will be accepted.`);
+// Handle menu navigation for cooks
+async function handleCookMenu(phoneNumber, command, store) {
+  const session = userSessions[phoneNumber];
+  
+  // Handle store settings menu
+  if (session?.state === 'store_settings') {
+    if (command === '1') {
+      await askConfirmation(phoneNumber, store, 'open');
+    } else if (command === '2') {
+      await askConfirmation(phoneNumber, store, 'close');
+    } else if (command === '0') {
+      delete userSessions[phoneNumber];
+      await showCookMainMenu(phoneNumber, store);
+    }
+    return true;
+  }
+  
+  // Handle confirmation menu
+  if (session?.state === 'confirm_action') {
+    if (command === '1') {
+      await executeStoreAction(phoneNumber, store, session.action);
+    } else if (command === '2') {
+      delete userSessions[phoneNumber];
+      await showStoreSettings(phoneNumber, store);
+    } else if (command === '0') {
+      delete userSessions[phoneNumber];
+      await showCookMainMenu(phoneNumber, store);
+    }
+    return true;
+  }
+  
+  // Main menu navigation
+  if (command === '0') {
+    await showCookMainMenu(phoneNumber, store);
+  } else if (command === '1') {
+    await showTodayOrders(phoneNumber, store);
+  } else if (command === '2') {
+    await showThisWeekEarnings(phoneNumber, store);
+  } else if (command === '3') {
+    await showLastWeekEarnings(phoneNumber, store);
+  } else if (command === '4') {
+    await showLastTwoWeeksEarnings(phoneNumber, store);
+  } else if (command === '5') {
+    await showThisMonthEarnings(phoneNumber, store);
+  } else if (command === '6') {
+    await showStoreSettings(phoneNumber, store);
+  } else {
+    await sendWasenderMessage(phoneNumber, `Invalid option. Reply with a number from the menu.`);
+  }
+  return true;
 }
 
-async function handleOpenStore(phoneNumber, store) {
-  await supabase.from('Stores').update({ Temporarily_Closed: false }).eq('Store_ID', store.Store_ID);
-  await sendWasenderMessage(phoneNumber, `👩‍🍳 ${store.Name}, your store is now OPEN. Customers can order again!`);
-}
-
+// Legacy command handler (CLOSE/OPEN text commands still work)
 async function handleCookCommand(phoneNumber, command, store) {
   if (command === 'CLOSE') {
-    await handleCloseStore(phoneNumber, store);
+    await askConfirmation(phoneNumber, store, 'close');
     return true;
   }
   if (command === 'OPEN') {
-    await handleOpenStore(phoneNumber, store);
+    await askConfirmation(phoneNumber, store, 'open');
     return true;
   }
   return false;
@@ -188,10 +274,6 @@ async function handleCookCommand(phoneNumber, command, store) {
 module.exports = {
   getCookStore,
   showCookMainMenu,
-  showTodayOrders,
-  showThisWeekEarnings,
-  showLastWeekEarnings,
-  showLastTwoWeeksEarnings,
-  showThisMonthEarnings,
+  handleCookMenu,
   handleCookCommand
 };
