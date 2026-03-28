@@ -24,9 +24,7 @@ module.exports = async (req, res) => {
       });
     }
     
-    // ✅ Clean the merchantReference - remove special characters, keep alphanumeric only
     const cleanReference = String(orderId).replace(/[^a-zA-Z0-9]/g, '');
-    
     const cleanPhone = String(customerPhone).replace(/\D/g, '');
     const formattedPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
     
@@ -65,7 +63,7 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         amount: Math.round(amount * 100),
         currency: 'ZAR',
-        merchantReference: cleanReference,  // ← Use cleaned version
+        merchantReference: cleanReference,
         returnUrl: 'https://beiju.co.za/order-confirmation',
         cancelUrl: 'https://beiju.co.za/checkout',
         payerName: customerName,
@@ -87,7 +85,9 @@ module.exports = async (req, res) => {
       });
     }
     
-    const paymentUrl = paymentData.url || paymentData.paymentUrl;
+    // ✅ Extract the payment URL from the correct path
+    const paymentUrl = paymentData.data?.payment?.link;
+    const paymentId = paymentData.data?.payment?.id;
     
     if (!paymentUrl) {
       console.error('❌ No payment URL in response:', paymentData);
@@ -102,7 +102,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({ 
       success: true, 
       url: paymentUrl, 
-      paymentId: paymentData.id 
+      paymentId: paymentId 
     });
     
   } catch (error) {
