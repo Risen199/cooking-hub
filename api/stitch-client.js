@@ -1,4 +1,6 @@
 // api/stitch-client.js
+const STITCH_API = 'https://express.stitch.money';
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -27,87 +29,63 @@ module.exports = async (req, res) => {
     
     console.log('🔧 Getting Stitch token...');
     
-    // Step 1: Get access token with correct parameters
-    const tokenResponse = await fetch('https://secure.stitch.money/connect/token', {
+    // Step 1: Get access token
+    const tokenResponse = await fetch(`${STITCH_API}/api/v1/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: process.env.STITCH_CLIENT_ID,
-        client_secret: process.env.STITCH_SECRET,
-        scope: 'client_paymentrequest',
-        audience: 'https://secure.stitch.money/connect/token'  // ← ADD THIS LINE
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: process.env.STITCH_CLIENT_ID,
+        clientSecret: process.env.STITCH_SECRET,
+        scope: 'client_paymentrequest'
       })
     });
     
     const tokenData = await tokenResponse.json();
     
-    if (!tokenData.access_token) {
+    if (!tokenData.success || !tokenData.data?.accessToken) {
       console.error('❌ Failed to get Stitch token:', tokenData);
       return res.status(200).json({ 
         success: false, 
-        error: tokenData.error || 'Authentication failed with Stitch' 
+        error: 'Authentication failed with Stitch' 
       });
     }
     
+    const accessToken = tokenData.data.accessToken;
     console.log('✅ Stitch token obtained');
     
-    // Step 2: Create payment request using GraphQL
-    const mutation = {
-      query: `
-        mutation CreatePaymentRequest($input: PaymentInitiationRequestCreateInput!) {
-          paymentInitiationRequestCreate(input: $input) {
-            id
-            url
-          }
-        }
-      `,
-      variables: {
-        input: {
-          amount: {
-            currency: "ZAR",
-            quantity: amount.toString()
-          },
-          paymentMethods: {
-            eft: { enabled: true }
-          },
-          externalReference: orderId,
-          payerInformation: {
-            payerId: customerEmail || orderId,
-            phoneNumber: formattedPhone
-          },
-          expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          metadata: {
-            orderId: orderId
-          },
-          redirectUri: "https://beiju.co.za/order-confirmation"
-        }
-      }
-    };
+    // Step 2: Create payment link
+    console.log('🔧 Creating payment link for order:', orderId);
     
-    console.log('🔧 Creating payment request for order:', orderId);
-    
-    const paymentResponse = await fetch('https://api.stitch.money/graphql', {
+    const paymentResponse = await fetch(`${STITCH_API}/api/v1/payment-links`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(mutation)
+      body: JSON.stringify({
+        amount: Math.round(amount * 100), // in cents
+        currency: 'ZAR',
+        reference: orderId,
+        returnUrl: 'https://beiju.co.za/order-confirmation',
+        cancelUrl: 'https://beiju.co.za/checkout',
+        customer: {
+          phone: formattedPhone,
+          email: customerEmail || 'customer@beiju.co.za'
+        }
+      })
     });
     
     const paymentData = await paymentResponse.json();
     
-    if (paymentData.errors) {
-      console.error('❌ Stitch GraphQL errors:', JSON.stringify(paymentData.errors, null, 2));
+    if (!paymentResponse.ok) {
+      console.error('❌ Stitch API error:', paymentData);
       return res.status(200).json({ 
         success: false, 
-        error: paymentData.errors[0].message 
+        error: paymentData.message || 'Payment creation failed' 
       });
     }
     
-    const paymentUrl = paymentData.data?.paymentInitiationRequestCreate?.url;
-    const paymentId = paymentData.data?.paymentInitiationRequestCreate?.id;
+    const paymentUrl = paymentData.url || paymentData.paymentUrl;
     
     if (!paymentUrl) {
       console.error('❌ No payment URL in response:', paymentData);
@@ -122,7 +100,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({ 
       success: true, 
       url: paymentUrl, 
-      paymentId: paymentId 
+      paymentId: paymentData.id 
     });
     
   } catch (error) {
