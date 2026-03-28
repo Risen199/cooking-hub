@@ -810,6 +810,16 @@
                 // Check payment method
                 if (store.payment_method === 'bank') {
                   // BANK PAYMENT — Create order first, then redirect to Stitch
+
+                                // 🔥 ADD DEBUG LOG
+              console.log('📦 Sending bank order:', {
+                Store_ID: store.Store_ID,
+                Customer_Name: name,
+                Customer_Phone: internationalPhone,
+                Total_Amount: total,
+                Pickup_Window: selectedTime
+              });
+              
                   const orderResponse = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

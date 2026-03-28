@@ -329,6 +329,8 @@ module.exports = async (req, res) => {
         // 3. Send via WasenderAPI to central number
         await sendWasenderMessage(waNumber, orderMessage);
         
+      console.log('📱 Customer phone from order:', data.Customer_Phone);
+
         // 4. Send auto-response to customer
         if (data.Customer_Phone && data.Customer_Phone !== 'Not provided') {
           await sendCustomerAutoResponse(
@@ -341,11 +343,12 @@ module.exports = async (req, res) => {
         // 5. Forward to store silently
         await forwardOrderToStore(data.Store_ID, orderMessage, data.Customer_Phone);
 
-        // 6. Return success
-        return res.status(200).json({ 
-          success: true,
-          message: 'Order processed with WasenderAPI'
-        });
+        // 6. Return success with orderId
+      return res.status(200).json({ 
+        success: true,
+        orderId: 'msg_' + Date.now(),  // ← ADD THIS LINE
+        message: 'Order processed with WasenderAPI'
+      });
       }
     }
 
