@@ -42,7 +42,7 @@
     { "source": "/mama-tshidi", "destination": "/store-view.html?storeId=ses_07" },
     { "source": "/aunty-vuyo", "destination": "/store-view.html?storeId=ses_08" },
     { "source": "/skile", "destination": "/store-view.html?storeId=val_01" },
-    { "source": "/nomsa-dish", "destination": "/store-view.html?storeId=vdk_01" },
+    { "source": "/chef-bobbys", "destination": "/store-view.html?storeId=vdk_01" },
     { "source": "/mama-rose", "destination": "/store-view.html?storeId=vdk_02" },
     { "source": "/sis-pinky", "destination": "/store-view.html?storeId=vdk_03" },
     { "source": "/aunty-joyce", "destination": "/store-view.html?storeId=vdk_04" },
