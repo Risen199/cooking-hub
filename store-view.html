@@ -856,6 +856,9 @@
               const orderData = await orderResponse.json();
               console.log('📦 Order data from API:', orderData);
               console.log('📦 orderId value:', orderData.orderId);
+
+              // 👇 PUT THE DEBUG LOG HERE 👇
+console.log('🔍 orderData.orderId is:', orderData.orderId, 'Type:', typeof orderData.orderId);
               
 
               if (orderData.success && orderData.orderId) {
