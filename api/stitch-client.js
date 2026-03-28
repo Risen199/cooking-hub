@@ -1,6 +1,5 @@
 // api/stitch-client.js
 module.exports = async (req, res) => {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -28,7 +27,7 @@ module.exports = async (req, res) => {
     
     console.log('🔧 Getting Stitch token...');
     
-    // Step 1: Get access token
+    // Step 1: Get access token with correct parameters
     const tokenResponse = await fetch('https://secure.stitch.money/connect/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -36,7 +35,8 @@ module.exports = async (req, res) => {
         grant_type: 'client_credentials',
         client_id: process.env.STITCH_CLIENT_ID,
         client_secret: process.env.STITCH_SECRET,
-        scope: 'client_paymentrequest'
+        scope: 'client_paymentrequest',
+        audience: 'https://secure.stitch.money/connect/token'  // ← ADD THIS LINE
       })
     });
     
@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
       console.error('❌ Failed to get Stitch token:', tokenData);
       return res.status(200).json({ 
         success: false, 
-        error: 'Authentication failed with Stitch' 
+        error: tokenData.error || 'Authentication failed with Stitch' 
       });
     }
     
