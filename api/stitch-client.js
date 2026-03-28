@@ -1,7 +1,6 @@
 // api/stitch-client.js
-const STITCH_API = 'https://api.sandbox.stitch.money/express/v1';
-
 module.exports = async (req, res) => {
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -20,51 +19,101 @@ module.exports = async (req, res) => {
     if (!orderId || !amount || !customerPhone) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing required fields: orderId, amount, customerPhone' 
+        error: 'Missing required fields' 
       });
     }
     
     const cleanPhone = String(customerPhone).replace(/\D/g, '');
     const formattedPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
     
-    console.log('🔧 Creating Stitch payment link for:', { orderId, amount, phone: formattedPhone });
+    console.log('🔧 Getting Stitch token...');
     
-    const response = await fetch(`${STITCH_API}/redirect-urls`, {
+    // Step 1: Get access token
+    const tokenResponse = await fetch('https://secure.stitch.money/connect/token', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.STITCH_SECRET}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        amount: Math.round(amount * 100),
-        currency: 'ZAR',
-        reference: orderId,
-        returnUrl: 'https://beiju.co.za/order-confirmation',
-        cancelUrl: 'https://beiju.co.za/checkout',
-        customer: {
-          phone: formattedPhone,
-          email: customerEmail || 'customer@beiju.co.za'
-        }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: process.env.STITCH_CLIENT_ID,
+        client_secret: process.env.STITCH_SECRET,
+        scope: 'client_paymentrequest'
       })
     });
     
-    const data = await response.json();
+    const tokenData = await tokenResponse.json();
     
-    if (!response.ok) {
-      console.error('❌ Stitch API error:', data);
+    if (!tokenData.access_token) {
+      console.error('❌ Failed to get Stitch token:', tokenData);
       return res.status(200).json({ 
         success: false, 
-        error: data.errors?.[0]?.message || 'Stitch payment failed'
+        error: 'Authentication failed with Stitch' 
       });
     }
     
-    const paymentUrl = data.url || data.redirectUrl;
+    console.log('✅ Stitch token obtained');
     
-    if (!paymentUrl) {
-      console.error('❌ No payment URL in response');
+    // Step 2: Create payment request using GraphQL
+    const mutation = {
+      query: `
+        mutation CreatePaymentRequest($input: PaymentInitiationRequestCreateInput!) {
+          paymentInitiationRequestCreate(input: $input) {
+            id
+            url
+          }
+        }
+      `,
+      variables: {
+        input: {
+          amount: {
+            currency: "ZAR",
+            quantity: amount.toString()
+          },
+          paymentMethods: {
+            eft: { enabled: true }
+          },
+          externalReference: orderId,
+          payerInformation: {
+            payerId: customerEmail || orderId,
+            phoneNumber: formattedPhone
+          },
+          expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          metadata: {
+            orderId: orderId
+          },
+          redirectUri: "https://beiju.co.za/order-confirmation"
+        }
+      }
+    };
+    
+    console.log('🔧 Creating payment request for order:', orderId);
+    
+    const paymentResponse = await fetch('https://api.stitch.money/graphql', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(mutation)
+    });
+    
+    const paymentData = await paymentResponse.json();
+    
+    if (paymentData.errors) {
+      console.error('❌ Stitch GraphQL errors:', JSON.stringify(paymentData.errors, null, 2));
       return res.status(200).json({ 
         success: false, 
-        error: 'Stitch did not return a payment URL'
+        error: paymentData.errors[0].message 
+      });
+    }
+    
+    const paymentUrl = paymentData.data?.paymentInitiationRequestCreate?.url;
+    const paymentId = paymentData.data?.paymentInitiationRequestCreate?.id;
+    
+    if (!paymentUrl) {
+      console.error('❌ No payment URL in response:', paymentData);
+      return res.status(200).json({ 
+        success: false, 
+        error: 'Stitch did not return a payment URL' 
       });
     }
     
@@ -73,7 +122,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({ 
       success: true, 
       url: paymentUrl, 
-      paymentId: data.id 
+      paymentId: paymentId 
     });
     
   } catch (error) {
