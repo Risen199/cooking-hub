@@ -511,6 +511,13 @@
 
       console.log('✅ Found store:', store.Name);
 
+
+      // 👇 PASTE THE DEBUG CODE RIGHT AFTER THIS LINE 👇
+      console.log('💰 FULL STORE OBJECT:', JSON.stringify(store, null, 2));
+      console.log('💰 Payment method:', store.payment_method);
+      console.log('💰 Payment method type:', typeof store.payment_method);
+
+
       if (store.Temporarily_Closed) {
         const heroContent = document.querySelector('.hero-content');
         heroContent.innerHTML += `
@@ -808,6 +815,10 @@
                 // Format phone to international
                 const internationalPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
 
+                // 👇 PASTE THIS RIGHT BEFORE THE PAYMENT CHECK 👇
+                console.log('🔍 PAYMENT CHECK - store.payment_method =', store.payment_method);
+                console.log('🔍 Is it "bank"?', store.payment_method === 'bank');
+                
                 // Check payment method
                 if (store.payment_method === 'bank') {
                   // BANK PAYMENT — Create order first, then redirect to Stitch
@@ -844,6 +855,7 @@
               const orderData = await orderResponse.json();
               console.log('📦 Order data from API:', orderData);
               console.log('📦 orderId value:', orderData.orderId);
+              
 
               if (orderData.success && orderData.orderId) {
 
