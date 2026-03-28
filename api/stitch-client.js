@@ -1,5 +1,5 @@
 // api/stitch-client.js
-const STITCH_API = 'https://api.stitch.money/express/v1';
+const STITCH_API = 'https://api.sandbox.stitch.money/express/v1';
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -50,18 +50,21 @@ module.exports = async (req, res) => {
     
     const data = await response.json();
     
-    // 🔥 DEBUG: Log the full Stitch response
-    console.log('📦 Full Stitch response:', JSON.stringify(data, null, 2));
-    
-    // Check if URL exists in the response
-    const paymentUrl = data.url || data.redirectUrl || data.paymentUrl || data.checkoutUrl;
-    
-    if (!paymentUrl) {
-      console.error('❌ No payment URL in response. Stitch response:', data);
+    if (!response.ok) {
+      console.error('❌ Stitch API error:', data);
       return res.status(200).json({ 
         success: false, 
-        error: 'Stitch did not return a payment URL',
-        stitchResponse: data
+        error: data.errors?.[0]?.message || 'Stitch payment failed'
+      });
+    }
+    
+    const paymentUrl = data.url || data.redirectUrl;
+    
+    if (!paymentUrl) {
+      console.error('❌ No payment URL in response');
+      return res.status(200).json({ 
+        success: false, 
+        error: 'Stitch did not return a payment URL'
       });
     }
     
