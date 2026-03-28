@@ -841,6 +841,8 @@
                   });
                   
                   const orderData = await orderResponse.json();
+                  console.log('📦 Order data from API:', orderData);
+                  console.log('📦 orderId value:', orderData.orderId);
                   
                   if (orderData.success && orderData.orderId) {
 
