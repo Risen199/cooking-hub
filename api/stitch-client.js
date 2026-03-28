@@ -2,7 +2,6 @@
 const STITCH_API = 'https://api.stitch.money/express/v1';
 
 module.exports = async (req, res) => {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,7 +17,6 @@ module.exports = async (req, res) => {
   try {
     const { orderId, amount, customerPhone, customerEmail } = req.body;
     
-    // Validate required fields
     if (!orderId || !amount || !customerPhone) {
       return res.status(400).json({ 
         success: false, 
@@ -26,7 +24,6 @@ module.exports = async (req, res) => {
       });
     }
     
-    // Clean phone number
     const cleanPhone = String(customerPhone).replace(/\D/g, '');
     const formattedPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
     
@@ -52,11 +49,27 @@ module.exports = async (req, res) => {
     });
     
     const data = await response.json();
-    console.log('✅ Stitch response received');
+    
+    // 🔥 DEBUG: Log the full Stitch response
+    console.log('📦 Full Stitch response:', JSON.stringify(data, null, 2));
+    
+    // Check if URL exists in the response
+    const paymentUrl = data.url || data.redirectUrl || data.paymentUrl || data.checkoutUrl;
+    
+    if (!paymentUrl) {
+      console.error('❌ No payment URL in response. Stitch response:', data);
+      return res.status(200).json({ 
+        success: false, 
+        error: 'Stitch did not return a payment URL',
+        stitchResponse: data
+      });
+    }
+    
+    console.log('✅ Payment URL created:', paymentUrl);
     
     return res.status(200).json({ 
       success: true, 
-      url: data.url, 
+      url: paymentUrl, 
       paymentId: data.id 
     });
     
