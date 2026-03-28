@@ -49,7 +49,7 @@ module.exports = async (req, res) => {
         .update({ 
           payment_status: 'paid', 
           payment_id: paymentId,
-          status: 'Ordered' // Mark as ready to send to cook
+          status: 'Ordered'
         })
         .eq('Message_ID', orderReference);
       
