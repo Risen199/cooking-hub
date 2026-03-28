@@ -173,16 +173,47 @@
       font-size: 0.875rem;
       text-decoration: none;
     }
-    /* POPIA consent styles */
-    .consent-text {
-      font-size: 0.8rem;
-      color: #666;
-      margin-top: 8px;
-      text-align: left;
+    /* Modal styles */
+    .terms-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      z-index: 4000;
+      align-items: center;
+      justify-content: center;
     }
-    .form-check-label a {
+    .terms-modal.active {
+      display: flex;
+    }
+    .terms-modal-content {
+      background: white;
+      border-radius: 20px;
+      padding: 25px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .terms-modal-content h4 {
       color: var(--brand-red);
-      text-decoration: none;
+      margin-bottom: 15px;
+    }
+    .terms-modal-content p {
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+    .close-terms {
+      background: var(--brand-red);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 50px;
+      margin-top: 15px;
+      width: 100%;
     }
   </style>
 </head>
@@ -194,6 +225,31 @@
       <p class="fw-bold fs-5" style="color: var(--brand-red);" id="detail-price"></p>
       <p id="detail-description"></p>
       <button class="btn btn-secondary mt-3" id="close-detail">Close</button>
+    </div>
+  </div>
+
+  <!-- Terms & Conditions Modal -->
+  <div id="terms-modal" class="terms-modal">
+    <div class="terms-modal-content">
+      <h4>📜 Terms & Conditions</h4>
+      <p><strong>Refund Policy:</strong> Refunds are only issued if the cook cannot fulfill your order. Processed within 3-5 business days. No refunds for change of mind after food is prepared.</p>
+      <p><strong>Cancellation:</strong> No cancellations after payment — food is prepared fresh for you.</p>
+      <p><strong>Data Usage:</strong> Your name and WhatsApp number are shared only with the cook and BEIJU. Not shared with any third party.</p>
+      <p><strong>Disputes:</strong> For any issues with your order, please contact the cook directly via WhatsApp.</p>
+      <p><strong>Liability:</strong> BEIJU is a platform connecting customers with cooks. We are not responsible for food quality or preparation.</p>
+      <button class="close-terms" onclick="closeTermsModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- Privacy Policy Modal -->
+  <div id="privacy-modal" class="terms-modal">
+    <div class="terms-modal-content">
+      <h4>🔒 Privacy Policy</h4>
+      <p><strong>Information We Collect:</strong> Your name, WhatsApp number, and order details.</p>
+      <p><strong>How We Use It:</strong> To confirm your order and communicate with the cook.</p>
+      <p><strong>Who We Share It With:</strong> Only the cook preparing your food. We never share your information with third parties.</p>
+      <p><strong>Your Rights:</strong> You can request deletion of your data by emailing beiju.enquiries@gmail.com.</p>
+      <button class="close-terms" onclick="closePrivacyModal()">Close</button>
     </div>
   </div>
 
@@ -232,6 +288,22 @@
       } else {
         window.location.href = 'index.html';
       }
+    }
+
+    function openTermsModal() {
+      document.getElementById('terms-modal').classList.add('active');
+    }
+
+    function closeTermsModal() {
+      document.getElementById('terms-modal').classList.remove('active');
+    }
+
+    function openPrivacyModal() {
+      document.getElementById('privacy-modal').classList.add('active');
+    }
+
+    function closePrivacyModal() {
+      document.getElementById('privacy-modal').classList.remove('active');
     }
   </script>
 
@@ -367,6 +439,27 @@
     return isNaN(h) ? { h: 8, m: 30 } : { h, m };
   }
 
+  // Create Stitch payment link
+  async function createStitchPayment(orderId, amount, customerPhone, customerEmail) {
+    try {
+      const response = await fetch('/api/stitch-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: orderId,
+          amount: amount,
+          customerPhone: customerPhone,
+          customerEmail: customerEmail
+        })
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Stitch error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', async function () {
     // Get info from URL — supports both clean URLs and query params
     const urlParams = new URLSearchParams(window.location.search);
@@ -380,8 +473,6 @@
 
     // If no storeId in query string, try to get it from the slug
     if (!storeId && cleanSlug && cleanSlug !== 'store-view.html' && cleanSlug !== 'hub.html' && cleanSlug !== '') {
-      // We'll need to look up the store by slug
-      // For now, storeId will be found when we load stores below
       console.log('🔍 Looking up store by slug:', cleanSlug);
     }
     
@@ -450,7 +541,7 @@
         document.getElementById('description-text').textContent = store.Area_Description.replace(/"/g, '');
       }
 
-      // 🔥 ADD THIS RIGHT AFTER THE LANDMARKS/DESCRIPTION CODE
+      // Google Maps button
       if (store.google_maps_link) {
         document.getElementById('google-maps-container').innerHTML = `
           <a href="${store.google_maps_link}" target="_blank" class="btn btn-outline-light btn-sm" style="background: var(--brand-red); color: white; border: none; padding: 8px 20px; border-radius: 50px; text-decoration: none; display: inline-block;">
@@ -653,12 +744,17 @@
                   <input type="tel" id="customer-phone" class="form-control mb-2" placeholder="e.g., 0723456789" maxlength="15">
                   <small class="text-muted d-block mb-3">So the kitchen can confirm your order</small>
                   
-                  <!-- POPIA Consent Checkbox -->
-                  <div class="form-check mb-3">
+                  <!-- UPDATED: POPIA Consent with Terms Links -->
+                  <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="consent-checkbox">
                     <label class="form-check-label" for="consent-checkbox">
-                      I agree that BEIJU may process my name and WhatsApp number to confirm this order. 
-                      My information will not be shared with anyone else.
+                      I agree that BEIJU may process my name and WhatsApp number to confirm this order.
+                    </label>
+                  </div>
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="terms-checkbox">
+                    <label class="form-check-label" for="terms-checkbox">
+                      I agree to the <a href="javascript:void(0)" onclick="openTermsModal()">Terms & Conditions</a> and <a href="javascript:void(0)" onclick="openPrivacyModal()">Privacy Policy</a>
                     </label>
                   </div>
                   
@@ -672,10 +768,11 @@
                 document.getElementById('checkout-btn').click();
               });
               
-              document.getElementById('confirm-name').addEventListener('click', () => {
+              document.getElementById('confirm-name').addEventListener('click', async () => {
                 const name = document.getElementById('customer-name').value.trim();
                 const phone = document.getElementById('customer-phone').value.trim();
                 const consent = document.getElementById('consent-checkbox').checked;
+                const termsAgreed = document.getElementById('terms-checkbox').checked;
                 
                 if (!name) {
                   alert("Please enter your name.");
@@ -695,7 +792,12 @@
                 }
                 
                 if (!consent) {
-                  alert("Please agree to the terms to continue.");
+                  alert("Please agree to the data processing terms.");
+                  return;
+                }
+                
+                if (!termsAgreed) {
+                  alert("Please agree to the Terms & Conditions and Privacy Policy.");
                   return;
                 }
 
@@ -705,48 +807,90 @@
                 // Format phone to international
                 const internationalPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
 
-                fetch(API_URL, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    action: 'order',
-                    Store_ID: store.Store_ID,
-                    Customer_Name: name,
-                    Customer_Phone: internationalPhone,
-                    Order_Items: lines.join('|'),
-                    Total_Amount: total,
-                    Pickup_Window: selectedTime,
-                    Delivery_Type: 'Collection',
-                    waNumber: document.body.dataset.waNumber,
-                    consentGiven: true,
-                    consentTimestamp: new Date().toISOString()
-                  })
-                })
-                .then(res => res.json())
-                .then(data => {
-                  if (data.success) {
-                    // ✅ SUCCESS! Order processed through WasenderAPI
-                    console.log('✅ Order sent via WasenderAPI');
-                    cart = [];
-                    window.cart = cart;
-                    updateCartUI();
-                    // Show success message
-                    alert('✅ Your order has been sent! You will receive a confirmation on WhatsApp shortly.');
+                // Check payment method
+                if (store.payment_method === 'bank') {
+                  // BANK PAYMENT — Create order first, then redirect to Stitch
+                  const orderResponse = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      action: 'order',
+                      Store_ID: store.Store_ID,
+                      Customer_Name: name,
+                      Customer_Phone: internationalPhone,
+                      Order_Items: lines.join('|'),
+                      Total_Amount: total,
+                      Pickup_Window: selectedTime,
+                      Delivery_Type: 'Collection',
+                      waNumber: document.body.dataset.waNumber,
+                      consentGiven: true,
+                      consentTimestamp: new Date().toISOString(),
+                      payment_method: 'bank',
+                      payment_status: 'pending'
+                    })
+                  });
+                  
+                  const orderData = await orderResponse.json();
+                  
+                  if (orderData.success && orderData.orderId) {
+                    // Create Stitch payment link
+                    const stitchResult = await createStitchPayment(
+                      orderData.orderId,
+                      total,
+                      internationalPhone,
+                      'customer@example.com' // You can collect email if needed
+                    );
+                    
+                    if (stitchResult.success && stitchResult.url) {
+                      // Redirect to Stitch payment page
+                      window.location.href = stitchResult.url;
+                    } else {
+                      alert('Payment gateway error. Please try again or use WhatsApp payment.');
+                    }
                   } else {
-                    // ⚠️ Fallback if something went wrong
-                    alert("Order processing issue. Opening WhatsApp directly...");
+                    alert('Error creating order. Please try again.');
+                  }
+                } else {
+                  // WHATSAPP PAYMENT — Original flow
+                  fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      action: 'order',
+                      Store_ID: store.Store_ID,
+                      Customer_Name: name,
+                      Customer_Phone: internationalPhone,
+                      Order_Items: lines.join('|'),
+                      Total_Amount: total,
+                      Pickup_Window: selectedTime,
+                      Delivery_Type: 'Collection',
+                      waNumber: document.body.dataset.waNumber,
+                      consentGiven: true,
+                      consentTimestamp: new Date().toISOString()
+                    })
+                  })
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success) {
+                      console.log('✅ Order sent via WasenderAPI');
+                      cart = [];
+                      window.cart = cart;
+                      updateCartUI();
+                      alert('✅ Your order has been sent! You will receive a confirmation on WhatsApp shortly.');
+                    } else {
+                      alert("Order processing issue. Opening WhatsApp directly...");
+                      const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
+                      const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
+                      window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+                    }
+                  })
+                  .catch(err => {
+                    console.warn("Logging failed:", err);
                     const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
                     const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
                     window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-                  }
-                })
-                .catch(err => {
-                  console.warn("Logging failed:", err);
-                  // Fallback on error
-                  const msg = `[${store.Store_ID}] ORDER FOR: ${name}\nPhone: ${internationalPhone}\n${lines.join('\n')}\nTotal: R${total.toFixed(2)}\n\nPickup window: ${selectedTime}`;
-                  const waNumber = document.body.dataset.waNumber.replace(/\D/g, '');
-                  window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
-                });
+                  });
+                }
 
                 document.body.removeChild(modal);
                 cartDrawer.classList.remove('active');
