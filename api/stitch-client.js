@@ -17,20 +17,21 @@ module.exports = async (req, res) => {
   try {
     const { orderId, amount, customerPhone, customerEmail, customerName } = req.body;
     
-    // ✅ Updated validation - check all required fields
     if (!orderId || !amount || !customerPhone || !customerName) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Missing required fields: orderId, amount, customerPhone, and customerName are required' 
+        error: 'Missing required fields' 
       });
     }
+    
+    // ✅ Clean the merchantReference - remove special characters, keep alphanumeric only
+    const cleanReference = String(orderId).replace(/[^a-zA-Z0-9]/g, '');
     
     const cleanPhone = String(customerPhone).replace(/\D/g, '');
     const formattedPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
     
     console.log('🔧 Getting Stitch token...');
     
-    // Step 1: Get access token
     const tokenResponse = await fetch(`${STITCH_API}/api/v1/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -53,9 +54,7 @@ module.exports = async (req, res) => {
     
     const accessToken = tokenData.data.accessToken;
     console.log('✅ Stitch token obtained');
-    
-    // Step 2: Create payment link with required fields
-    console.log('🔧 Creating payment link for order:', orderId);
+    console.log('🔧 Creating payment link for order:', orderId, 'Clean reference:', cleanReference);
     
     const paymentResponse = await fetch(`${STITCH_API}/api/v1/payment-links`, {
       method: 'POST',
@@ -66,7 +65,7 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         amount: Math.round(amount * 100),
         currency: 'ZAR',
-        merchantReference: orderId,
+        merchantReference: cleanReference,  // ← Use cleaned version
         returnUrl: 'https://beiju.co.za/order-confirmation',
         cancelUrl: 'https://beiju.co.za/checkout',
         payerName: customerName,
