@@ -818,6 +818,7 @@
                 // 👇 PASTE THIS RIGHT BEFORE THE PAYMENT CHECK 👇
                 console.log('🔍 PAYMENT CHECK - store.payment_method =', store.payment_method);
                 console.log('🔍 Is it "bank"?', store.payment_method === 'bank');
+                console.log('🔍 store object available?', store ? 'YES' : 'NO');
                 
                 // Check payment method
                 if (store.payment_method === 'bank') {
