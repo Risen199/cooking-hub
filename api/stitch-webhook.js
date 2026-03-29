@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
 
     const { event, data } = payload;
 
-    if (event === 'payment.succeeded') {
+    if (event === 'payment.paid') {
       const paymentId = data.id;
       const orderReference = data.reference;
       const amount = data.amount / 100; // convert from cents
@@ -69,7 +69,7 @@ module.exports = async (req, res) => {
         // Send order to cook (forward)
         const storeWhatsApp = order.Stores?.WhatsApp;
         if (storeWhatsApp) {
-          const orderMessage = `🛍️ NEW ORDER (PAID)\n[${order.Store_ID}] ORDER FOR: ${order.Customer_Name}\nPhone: ${order.Customer_Phone}\n${order.Order_Items}\nTotal: R${order.Total_Amount}\nPickup: ${order.Pickup_Window}`;
+          const orderMessage = `🛍️ NEW ORDER (PAID)\n[${order.Store_ID}] ORDER FOR: ${order.Customer_Name}\nPhone: ${order.Customer_Name}\n${order.Order_Items}\nTotal: R${order.Total_Amount}\nPickup: ${order.Pickup_Window}`;
           await sendWasenderMessage(storeWhatsApp, orderMessage);
           console.log(`📱 Order forwarded to cook: ${storeWhatsApp}`);
         }
