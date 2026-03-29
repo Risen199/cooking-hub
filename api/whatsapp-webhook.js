@@ -1,6 +1,6 @@
 // api/whatsapp-webhook.js — Main handler
 const { sendWasenderMessage, extractPhoneNumber, hasHumanReplied, isWithinActiveWindow, logMessage } = require('./whatsapp/utils');
-const { getCookStore, showCookMainMenu, showTodayOrders, showThisWeekEarnings, showLastWeekEarnings, showLastTwoWeeksEarnings, showThisMonthEarnings, handleCookCommand } = require('./whatsapp/cook');
+const { getCookStore, showCookMainMenu, showTodayOrders, showThisWeekEarnings, showLastWeekEarnings, showLastTwoWeeksEarnings, showThisMonthEarnings, handleCookCommand, handleCookMenu } = require('./whatsapp/cook');
 const { showMainMenu, showThisWeekDetails, showLastWeekDetails, showAllStores, showThisMonthDetails } = require('./whatsapp/promoter');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -48,7 +48,7 @@ module.exports = async (req, res) => {
     const withinWindow = await isWithinActiveWindow(formattedNumber);
     const command = messageText.toUpperCase().trim();
 
-          // ========== COOK DASHBOARD ==========
+  // ========== COOK DASHBOARD ==========
     const cookStore = await getCookStore(formattedNumber);
 
     if (cookStore) {
