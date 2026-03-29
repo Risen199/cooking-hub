@@ -48,32 +48,23 @@ module.exports = async (req, res) => {
     const withinWindow = await isWithinActiveWindow(formattedNumber);
     const command = messageText.toUpperCase().trim();
 
-    // ========== COOK DASHBOARD ==========
+          // ========== COOK DASHBOARD ==========
     const cookStore = await getCookStore(formattedNumber);
-    
+
     if (cookStore) {
       console.log(`👩‍🍳 Cook detected: ${cookStore.Name}`);
       
-      // Check for CLOSE/OPEN commands first
+      // First check for CLOSE/OPEN commands
       const handled = await handleCookCommand(formattedNumber, command, cookStore);
       if (handled) return res.status(200).json({ status: 'OK' });
       
-      if (command === 'DASHBOARD' || command === '0') {
-        await showCookMainMenu(formattedNumber, cookStore);
-      } else if (command === '1') {
-        await showTodayOrders(formattedNumber, cookStore);
-      } else if (command === '2') {
-        await showThisWeekEarnings(formattedNumber, cookStore);
-      } else if (command === '3') {
-        await showLastWeekEarnings(formattedNumber, cookStore);
-      } else if (command === '4') {
-        await showLastTwoWeeksEarnings(formattedNumber, cookStore);
-      } else if (command === '5') {
-        await showThisMonthEarnings(formattedNumber, cookStore);
-      } else {
-        await sendWasenderMessage(formattedNumber, 
-          `👩‍🍳 *${cookStore.Name}*\n\nReply *DASHBOARD* to see your earnings and orders.\n\nCommands:\n1️⃣ Today's orders\n2️⃣ This week\n3️⃣ Last week\n4️⃣ Last 2 weeks\n5️⃣ This month\n0️⃣ Main menu\n\nCLOSE - Close store\nOPEN - Open store`);
-      }
+      // Then handle menu navigation (including confirmation responses)
+      const menuHandled = await handleCookMenu(formattedNumber, command, cookStore);
+      if (menuHandled) return res.status(200).json({ status: 'OK' });
+      
+      // If nothing handled, show help
+      await sendWasenderMessage(formattedNumber, 
+        `👩‍🍳 *${cookStore.Name}*\n\nReply DASHBOARD or 0 to see menu\n\nCLOSE - Close store\nOPEN - Open store`);
       return res.status(200).json({ status: 'OK' });
     }
 
