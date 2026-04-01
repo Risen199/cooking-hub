@@ -1,7 +1,7 @@
 {
   "rewrites": [
     { "source": "/smu", "destination": "/hub.html?township=SMU" },
-    { "source": "/thohoyandou", "destination": "/hub.html?township=THO" },
+    { "source": "/thoyandou", "destination": "/hub.html?township=THO" },
     { "source": "/soweto", "destination": "/hub.html?township=SWT" },
     { "source": "/mokopane", "destination": "/hub.html?township=MKN" },
     { "source": "/tembisa", "destination": "/hub.html?township=TEM" },
