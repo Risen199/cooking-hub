@@ -37,31 +37,43 @@ module.exports = async (req, res) => {
     const payload = req.body;
     console.log('📩 Stitch webhook received:', payload);
 
-    const { event, data } = payload;
-
-    if (event === 'payment.paid') {
-      const paymentId = data.id;
-      const orderReference = data.reference;
-      const amount = data.amount / 100;
+    // Handle Stitch webhook format
+    if (payload.status === 'PAID') {
+      const paymentId = payload.id;
+      const stitchLinkId = payload.id; // This is the linkId sent in webhook
+      const amount = payload.amount / 100;
       
-      console.log(`✅ Payment succeeded: order ${orderReference}, payment ${paymentId}, amount R${amount}`);
+      console.log(`✅ Payment succeeded: linkId ${stitchLinkId}, payment ${paymentId}, amount R${amount}`);
       
-      // Get the order details first
+      // Find order by stitch_link_id (NOT Message_ID)
       const { data: order, error: fetchError } = await supabase
         .from('Messages')
         .select('*, Stores(WhatsApp, Name)')
-        .eq('Message_ID', orderReference)
+        .eq('stitch_link_id', stitchLinkId)
         .single();
       
       if (fetchError) {
-        console.error('❌ Failed to fetch order:', fetchError);
-        return res.status(500).json({ error: 'Order fetch failed' });
+        console.error('❌ Failed to fetch order by stitch_link_id:', fetchError);
+        // Try fallback: search by Message_ID if stitch_link_id not found
+        const { data: orderById, error: fetchByIdError } = await supabase
+          .from('Messages')
+          .select('*, Stores(WhatsApp, Name)')
+          .eq('Message_ID', stitchLinkId)
+          .single();
+        
+        if (fetchByIdError || !orderById) {
+          console.error('❌ Order not found by linkId or Message_ID:', stitchLinkId);
+          return res.status(200).json({ received: true });
+        }
+        order = orderById;
       }
       
       if (!order) {
-        console.error('❌ Order not found:', orderReference);
+        console.error('❌ Order not found:', stitchLinkId);
         return res.status(200).json({ received: true });
       }
+      
+      console.log(`✅ Found order: ${order.Message_ID} for linkId: ${stitchLinkId}`);
       
       // Update order status
       const { error: updateError } = await supabase
@@ -71,7 +83,7 @@ module.exports = async (req, res) => {
           payment_id: paymentId,
           status: 'Ordered'
         })
-        .eq('Message_ID', orderReference);
+        .eq('Message_ID', order.Message_ID);
       
       if (updateError) {
         console.error('❌ Failed to update order:', updateError);
@@ -105,7 +117,7 @@ module.exports = async (req, res) => {
           console.error(`❌ Failed to send WhatsApp to customer: ${order.Customer_Phone}`);
         }
       } else {
-        console.log(`⚠️ No customer phone number for order: ${orderReference}`);
+        console.log(`⚠️ No customer phone number for order: ${order.Message_ID}`);
       }
       
       // Update whatsapp_sent status
@@ -113,8 +125,8 @@ module.exports = async (req, res) => {
         await supabase
           .from('Messages')
           .update({ whatsapp_sent: true })
-          .eq('Message_ID', orderReference);
-        console.log(`✅ WhatsApp status updated for order: ${orderReference}`);
+          .eq('Message_ID', order.Message_ID);
+        console.log(`✅ WhatsApp status updated for order: ${order.Message_ID}`);
       }
     }
     

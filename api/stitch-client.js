@@ -83,9 +83,10 @@ module.exports = async (req, res) => {
       });
     }
     
-    // Extract the payment URL
+    // Extract payment details
     let paymentUrl = paymentData.data?.payment?.link;
     const paymentId = paymentData.data?.payment?.id;
+    const stitchLinkId = paymentData.data?.payment?.id; // This is the linkId
     
     if (!paymentUrl) {
       console.error('❌ No payment URL in response:', paymentData);
@@ -100,11 +101,13 @@ module.exports = async (req, res) => {
     paymentUrl = `${paymentUrl}?redirect_url=${returnUrl}`;
     
     console.log('✅ Payment URL created:', paymentUrl);
+    console.log('🔗 Stitch Link ID:', stitchLinkId);
     
     return res.status(200).json({ 
       success: true, 
       url: paymentUrl, 
-      paymentId: paymentId 
+      paymentId: paymentId,
+      linkId: stitchLinkId  // ← Return linkId to frontend
     });
     
   } catch (error) {

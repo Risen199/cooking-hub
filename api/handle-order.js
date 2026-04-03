@@ -310,7 +310,8 @@ module.exports = async (req, res) => {
             Timestamp: getSATimestamp(),
             Source: 'Website',
             payment_status: data.payment_method === 'bank' ? 'pending' : 'paid',
-            whatsapp_sent: false
+            whatsapp_sent: false,
+            stitch_link_id: data.stitch_link_id || null
           }]);
 
         // 2. Insert into Consent_Logs table

@@ -173,7 +173,6 @@
       font-size: 0.875rem;
       text-decoration: none;
     }
-    /* Modal styles */
     .terms-modal {
       display: none;
       position: fixed;
@@ -215,6 +214,13 @@
       margin-top: 15px;
       width: 100%;
     }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
   </style>
 </head>
 <body data-wa-number="27726515909">
@@ -228,7 +234,6 @@
     </div>
   </div>
 
-  <!-- Terms & Conditions Modal -->
   <div id="terms-modal" class="terms-modal">
     <div class="terms-modal-content">
       <h4>📜 Terms & Conditions</h4>
@@ -241,7 +246,6 @@
     </div>
   </div>
 
-  <!-- Privacy Policy Modal -->
   <div id="privacy-modal" class="terms-modal">
     <div class="terms-modal-content">
       <h4>🔒 Privacy Policy</h4>
@@ -315,8 +319,7 @@
         <p id="landmarks-text"></p>
         <p id="description-text" style="font-style: italic;"></p>
       </div>
-    <!-- Google Maps Container -->
-    <div id="google-maps-container" style="margin-top: 10px; text-align: center;"></div>
+      <div id="google-maps-container" style="margin-top: 10px; text-align: center;"></div>
     </div>
   </section>
 
@@ -439,7 +442,6 @@
     return isNaN(h) ? { h: 8, m: 30 } : { h, m };
   }
 
-  // Create Stitch payment link
   async function createStitchPayment(orderId, amount, customerPhone, customerEmail, customerName) {
     try {
       const response = await fetch('/api/stitch-client', {
@@ -462,30 +464,23 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
-    // Get info from URL — supports both clean URLs and query params
     const urlParams = new URLSearchParams(window.location.search);
     let storeId = urlParams.get('storeId');
     let from = urlParams.get('from');
     let township = urlParams.get('township');
 
-    // Get clean slug from URL path (e.g., /aunty-thandi)
     let path = window.location.pathname;
     let cleanSlug = path.replace(/^\//, '').replace(/\/$/, '');
 
-    // If no storeId in query string, try to get it from the slug
     if (!storeId && cleanSlug && cleanSlug !== 'store-view.html' && cleanSlug !== 'hub.html' && cleanSlug !== '') {
       console.log('🔍 Looking up store by slug:', cleanSlug);
     }
     
     try {
-      // Load all stores
       const storeRes = await fetch(`${API_URL}?action=stores`);
       const storeData = await storeRes.json();
       if (!storeData.success) throw new Error('Failed to load stores');
 
-      // Try to find store by:
-      // 1. Clean slug first (new way)
-      // 2. Store ID second (old way)
       let store = null;
       
       if (cleanSlug && cleanSlug !== 'store-view.html' && cleanSlug !== 'hub.html' && cleanSlug !== '') {
@@ -511,13 +506,6 @@
 
       console.log('✅ Found store:', store.Name);
 
-
-      // 👇 PASTE THE DEBUG CODE RIGHT AFTER THIS LINE 👇
-      console.log('💰 FULL STORE OBJECT:', JSON.stringify(store, null, 2));
-      console.log('💰 Payment method:', store.payment_method);
-      console.log('💰 Payment method type:', typeof store.payment_method);
-
-
       if (store.Temporarily_Closed) {
         const heroContent = document.querySelector('.hero-content');
         heroContent.innerHTML += `
@@ -532,7 +520,6 @@
       document.getElementById('store-name').textContent = store.Name || 'Local Kitchen';
       document.getElementById('store-slogan').textContent = store.Slogan || '';
       
-      // Update hero background with store's actual image
       const heroSection = document.querySelector('.hero');
       if (store.Hero_URL) {
         heroSection.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('${store.Hero_URL}')`;
@@ -549,7 +536,6 @@
         document.getElementById('description-text').textContent = store.Area_Description.replace(/"/g, '');
       }
 
-      // Google Maps button
       if (store.google_maps_link) {
         document.getElementById('google-maps-container').innerHTML = `
           <a href="${store.google_maps_link}" target="_blank" class="btn btn-outline-light btn-sm" style="background: var(--brand-red); color: white; border: none; padding: 8px 20px; border-radius: 50px; text-decoration: none; display: inline-block;">
@@ -570,7 +556,6 @@
       storeHours.closing = store.Closing_Time_Clean || "18:00";
       storeHours.prepMinutes = store.Prep_Time_Minutes || 60;
 
-      // Load menu using store ID
       const menuRes = await fetch(`${API_URL}?action=menu&storeId=${store.Store_ID}`);
       const menuData = await menuRes.json();
       if (!menuData.success) throw new Error('Failed to load menu');
@@ -582,7 +567,6 @@
         return;
       }
 
-      // Build menu HTML with images
       let menuHtml = '';
       menuData.menu.forEach(item => {
         const itemImage = item.Image_URL || 'assets/images/default-food.jpg';
@@ -605,7 +589,6 @@
       });
       menuContainer.innerHTML = menuHtml;
 
-      // Initialize cart
       let cart = [];
       window.cart = cart;
 
@@ -655,7 +638,6 @@
         }
       }
 
-      // View Details Modal
       document.querySelectorAll('.view-details').forEach(link => {
         link.addEventListener('click', function(e) {
           e.preventDefault();
@@ -743,16 +725,13 @@
                 <div style="background: white; border-radius: 15px; padding: 25px; width: 90%; max-width: 500px;">
                   <h4 class="mb-3">Complete Your Order</h4>
                   
-                  <!-- Name field -->
                   <p class="text-muted mb-1">Your name</p>
                   <input type="text" id="customer-name" class="form-control mb-3" placeholder="e.g., Blessing" maxlength="20">
                   
-                  <!-- Phone number field -->
                   <p class="text-muted mb-1">WhatsApp number <span class="text-danger">*</span></p>
                   <input type="tel" id="customer-phone" class="form-control mb-2" placeholder="e.g., 0723456789" maxlength="15">
                   <small class="text-muted d-block mb-3">So the kitchen can confirm your order</small>
                   
-                  <!-- UPDATED: POPIA Consent with Terms Links -->
                   <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="consent-checkbox">
                     <label class="form-check-label" for="consent-checkbox">
@@ -792,7 +771,6 @@
                   return;
                 }
                 
-                // Basic SA phone validation
                 const cleanPhone = phone.replace(/\D/g, '');
                 if (cleanPhone.length < 10 || cleanPhone.length > 12) {
                   alert("Please enter a valid South African WhatsApp number (e.g., 0723456789)");
@@ -812,154 +790,111 @@
                 const lines = cart.map(i => `- ${i.name} x${i.qty} (R${(i.price * i.qty).toFixed(2)})`);
                 const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
                 
-                // Format phone to international
                 const internationalPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
 
-                // 👇 PASTE THIS RIGHT BEFORE THE PAYMENT CHECK 👇
-                console.log('🔍 PAYMENT CHECK - store.payment_method =', store.payment_method);
-                console.log('🔍 Is it "bank"?', store.payment_method === 'bank');
-                console.log('🔍 store object available?', store ? 'YES' : 'NO');
-                
-                // Check payment method
+                // BANK PAYMENT FLOW
                 if (store.payment_method === 'bank') {
-                  // BANK PAYMENT — Create order first, then redirect to Stitch
 
-                                // 🔥 ADD DEBUG LOG
-              console.log('📦 Sending bank order:', {
-                Store_ID: store.Store_ID,
-                Customer_Name: name,
-                Customer_Phone: internationalPhone,
-                Total_Amount: total,
-                Pickup_Window: selectedTime
-              });
+                  console.log('🔧 Creating Stitch payment link first...');
+                  
+                  const tempId = 'temp_' + Date.now();
+                  const stitchResult = await createStitchPayment(
+                    tempId,
+                    total,
+                    internationalPhone,
+                    'customer@example.com',
+                    name
+                  );
 
-              const orderResponse = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  action: 'order',
-                  Store_ID: store.Store_ID,
-                  Customer_Name: name,
-                  Customer_Phone: internationalPhone,
-                  Order_Items: lines.join('|'),
-                  Total_Amount: total,
-                  Pickup_Window: selectedTime,
-                  Delivery_Type: 'Collection',
-                  waNumber: document.body.dataset.waNumber,
-                  consentGiven: true,
-                  consentTimestamp: new Date().toISOString(),
-                  payment_method: 'bank',
-                  payment_status: 'pending'
-                })
-              });
+                  if (!stitchResult.success || !stitchResult.linkId) {
+                    alert('Payment gateway error. Please try again or use WhatsApp payment.');
+                    return;
+                  }
 
-              const orderData = await orderResponse.json();
-              console.log('📦 Order data from API:', orderData);
-              console.log('📦 orderId value:', orderData.orderId);
+                  const stitchLinkId = stitchResult.linkId;
+                  const myOrderId = 'msg_' + Date.now();
 
-              // 👇 PUT THE DEBUG LOG HERE 👇
-console.log('🔍 orderData.orderId is:', orderData.orderId, 'Type:', typeof orderData.orderId);
-              
+                  console.log('📦 Stitch linkId obtained:', stitchLinkId);
+                  console.log('📦 Creating order with linkId...');
 
-              if (orderData.success && orderData.orderId) {
+                  const orderResponse = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      action: 'order',
+                      Store_ID: store.Store_ID,
+                      Customer_Name: name,
+                      Customer_Phone: internationalPhone,
+                      Order_Items: lines.join('|'),
+                      Total_Amount: total,
+                      Pickup_Window: selectedTime,
+                      Delivery_Type: 'Collection',
+                      waNumber: document.body.dataset.waNumber,
+                      consentGiven: true,
+                      consentTimestamp: new Date().toISOString(),
+                      payment_method: 'bank',
+                      payment_status: 'pending',
+                      stitch_link_id: stitchLinkId,
+                      Message_ID: myOrderId
+                    })
+                  });
 
+                  const orderData = await orderResponse.json();
 
-              // Show loading overlay (matching index.html style but 2x bigger)
-              const loadingOverlay = document.createElement('div');
-              loadingOverlay.id = 'payment-loading';
-              loadingOverlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.9);
-                z-index: 9999;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-direction: column;
-                color: white;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-              `;
+                  if (orderData.success) {
+                    const loadingOverlay = document.createElement('div');
+                    loadingOverlay.id = 'payment-loading';
+                    loadingOverlay.style.cssText = `
+                      position: fixed;
+                      top: 0;
+                      left: 0;
+                      width: 100%;
+                      height: 100%;
+                      background: rgba(0,0,0,0.9);
+                      z-index: 9999;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      flex-direction: column;
+                      color: white;
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    `;
 
-              // Rotating messages (same as index.html)
-              const paymentMessages = [
-                "💰 Preparing your secure payment...",
-                "🔗 Connecting to Stitch...",
-                "💳 Almost there...",
-                "🛡️ Verifying payment gateway...",
-                "✅ Finalizing your order...",
-                "🍽️ Your food is almost ready..."
-              ];
+                    const paymentMessages = [
+                      "💰 Preparing your secure payment...",
+                      "🔗 Connecting to Stitch...",
+                      "💳 Almost there...",
+                      "🛡️ Verifying payment gateway...",
+                      "✅ Finalizing your order...",
+                      "🍽️ Your food is almost ready..."
+                    ];
 
-              let paymentMessageIndex = 0;
-              let paymentMessageInterval;
+                    let paymentMessageIndex = 0;
+                    let paymentMessageInterval;
 
-              loadingOverlay.innerHTML = `
-                <div style="text-align: center;">
-                  <div class="loading-beiju-big" style="font-size: 3rem; font-weight: 900; color: #ff0000; animation: pulse-big 1.5s ease-in-out infinite; margin-bottom: 20px;">BEIJU</div>
-                  <div class="loading-spinner-big" style="display: inline-block; width: 80px; height: 80px; border: 6px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #ff0000; animation: spin-big 1s ease-in-out infinite; margin: 20px auto;"></div>
-                  <p class="mt-4 text-white" id="payment-loading-message" style="font-size: 1.2rem;">${paymentMessages[0]}</p>
-                </div>
-              `;
+                    loadingOverlay.innerHTML = `
+                      <div style="text-align: center;">
+                        <div style="font-size: 3rem; font-weight: 900; color: #ff0000; animation: pulse 1.5s ease-in-out infinite; margin-bottom: 20px;">BEIJU</div>
+                        <div style="display: inline-block; width: 80px; height: 80px; border: 6px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #ff0000; animation: spin 1s linear infinite; margin: 20px auto;"></div>
+                        <p id="payment-loading-message" style="color: white; font-size: 1.2rem;">${paymentMessages[0]}</p>
+                      </div>
+                    `;
+                    document.body.appendChild(loadingOverlay);
 
-              document.body.appendChild(loadingOverlay);
-
-              // Add keyframe styles for the bigger animations
-              const style = document.createElement('style');
-              style.textContent = `
-                @keyframes spin-big {
-                  to { transform: rotate(360deg); }
-                }
-                @keyframes pulse-big {
-                  0%, 100% { opacity: 0.5; transform: scale(1); }
-                  50% { opacity: 1; transform: scale(1.1); }
-                }
-              `;
-              document.head.appendChild(style);
-
-              // Start rotating messages
-              paymentMessageInterval = setInterval(() => {
-                paymentMessageIndex = (paymentMessageIndex + 1) % paymentMessages.length;
-                const msgEl = document.getElementById('payment-loading-message');
-                if (msgEl) msgEl.textContent = paymentMessages[paymentMessageIndex];
-              }, 2000);
-
-           
-                     // 🔥 ADD DEBUG LOG HERE
-              console.log('🔧 Calling createStitchPayment with:', {
-                orderId: orderData.orderId,
-                total: total,
-                phone: internationalPhone,
-                email: 'customer@example.com',
-                name: name
-              });
-
-                    // Create Stitch payment link
-                    const stitchResult = await createStitchPayment(
-                      orderData.orderId,
-                      total,
-                      internationalPhone,
-                      'customer@example.com', // You can collect email if needed
-                      name
-                    );
+                    paymentMessageInterval = setInterval(() => {
+                      paymentMessageIndex = (paymentMessageIndex + 1) % paymentMessages.length;
+                      const msgEl = document.getElementById('payment-loading-message');
+                      if (msgEl) msgEl.textContent = paymentMessages[paymentMessageIndex];
+                    }, 2000);
                     
-                                   if (stitchResult.success && stitchResult.url) {
-                // Clear interval and remove overlay before redirect
-                clearInterval(paymentMessageInterval);
-                window.location.href = stitchResult.url;
-              } else {
-                clearInterval(paymentMessageInterval);
-                document.body.removeChild(loadingOverlay);
-                alert('Payment gateway error. Please try again or use WhatsApp payment.');
-              }
-
+                    setTimeout(() => {
+                      window.location.href = stitchResult.url;
+                    }, 500);
                   } else {
                     alert('Error creating order. Please try again.');
                   }
                 } else {
-                  // WHATSAPP PAYMENT — Original flow
+                  // WHATSAPP PAYMENT FLOW
                   fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
