@@ -25,6 +25,9 @@ async function sendWasenderMessage(to, text) {
 }
 
 module.exports = async (req, res) => {
+  console.log('🔥 Webhook hit! Method:', req.method, 'URL:', req.url);
+  console.log('📦 Body:', req.body);
+  
   // Only accept POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -81,7 +84,7 @@ module.exports = async (req, res) => {
       // Send order to cook
       const storeWhatsApp = order.Stores?.WhatsApp;
       if (storeWhatsApp) {
-        const orderMessage = `🛍️ NEW ORDER (PAID)\n[${order.Store_ID}] ORDER FOR: ${order.Customer_Name}\nPhone: ${order.Customer_Name}\n${order.Order_Items}\nTotal: R${order.Total_Amount}\nPickup: ${order.Pickup_Window}`;
+        const orderMessage = `🛍️ NEW ORDER (PAID)\n[${order.Store_ID}] ORDER FOR: ${order.Customer_Name}\n${order.Order_Items}\nTotal: R${order.Total_Amount}\nPickup: ${order.Pickup_Window}`;
         const result = await sendWasenderMessage(storeWhatsApp, orderMessage);
         if (result && result.success !== false) {
           cookWhatsAppSent = true;
@@ -92,7 +95,7 @@ module.exports = async (req, res) => {
       }
       
       // Send confirmation to customer
-      if (order.Customer_Phone && order.Customer_Phone !== 'Not provided') {
+      if (order.Customer_Phone && order.Customer_Phone !== 'Not provided' && order.Customer_Phone !== 'null') {
         const confirmMsg = `✅ Payment received! Your order has been confirmed.\n\n🍳 ${order.Store_ID}\n📦 ${order.Order_Items}\n💰 Total: R${order.Total_Amount}\n⏰ Pickup: ${order.Pickup_Window}\n\nThank you for ordering from BEIJU! 🇿🇦`;
         const result = await sendWasenderMessage(order.Customer_Phone, confirmMsg);
         if (result && result.success !== false) {
@@ -101,6 +104,8 @@ module.exports = async (req, res) => {
         } else {
           console.error(`❌ Failed to send WhatsApp to customer: ${order.Customer_Phone}`);
         }
+      } else {
+        console.log(`⚠️ No customer phone number for order: ${orderReference}`);
       }
       
       // Update whatsapp_sent status
