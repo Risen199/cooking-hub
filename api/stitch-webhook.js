@@ -97,6 +97,7 @@ module.exports = async (req, res) => {
       if (storeWhatsApp) {
         const orderMessage = `🛍️ NEW ORDER (PAID)\n[${order.Store_ID}] ORDER FOR: ${order.Customer_Name}\n${order.Order_Items}\nTotal: R${order.Total_Amount}\nPickup: ${order.Pickup_Window}`;
         const result = await sendWasenderMessage(storeWhatsApp, orderMessage);
+          console.log('🔍 WASENDER RESULT FOR COOK:', JSON.stringify(result));
         if (result && result.success !== false) {
           cookWhatsAppSent = true;
           console.log(`📱 Order forwarded to cook: ${storeWhatsApp}`);
