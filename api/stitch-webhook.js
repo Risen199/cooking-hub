@@ -39,11 +39,28 @@ module.exports = async (req, res) => {
     if (event === 'payment.paid') {
       const paymentId = data.id;
       const orderReference = data.reference;
-      const amount = data.amount / 100; // convert from cents
+      const amount = data.amount / 100;
       
       console.log(`✅ Payment succeeded: order ${orderReference}, payment ${paymentId}, amount R${amount}`);
       
-      // Update order status in Messages table
+      // Get the order details first
+      const { data: order, error: fetchError } = await supabase
+        .from('Messages')
+        .select('*, Stores(WhatsApp, Name)')
+        .eq('Message_ID', orderReference)
+        .single();
+      
+      if (fetchError) {
+        console.error('❌ Failed to fetch order:', fetchError);
+        return res.status(500).json({ error: 'Order fetch failed' });
+      }
+      
+      if (!order) {
+        console.error('❌ Order not found:', orderReference);
+        return res.status(200).json({ received: true });
+      }
+      
+      // Update order status
       const { error: updateError } = await supabase
         .from('Messages')
         .update({ 
@@ -58,28 +75,41 @@ module.exports = async (req, res) => {
         return res.status(500).json({ error: 'Database update failed' });
       }
       
-      // Get the order details
-      const { data: order } = await supabase
-        .from('Messages')
-        .select('*, Stores(WhatsApp, Name)')
-        .eq('Message_ID', orderReference)
-        .single();
+      let cookWhatsAppSent = false;
+      let customerWhatsAppSent = false;
       
-      if (order) {
-        // Send order to cook (forward)
-        const storeWhatsApp = order.Stores?.WhatsApp;
-        if (storeWhatsApp) {
-          const orderMessage = `🛍️ NEW ORDER (PAID)\n[${order.Store_ID}] ORDER FOR: ${order.Customer_Name}\nPhone: ${order.Customer_Name}\n${order.Order_Items}\nTotal: R${order.Total_Amount}\nPickup: ${order.Pickup_Window}`;
-          await sendWasenderMessage(storeWhatsApp, orderMessage);
+      // Send order to cook
+      const storeWhatsApp = order.Stores?.WhatsApp;
+      if (storeWhatsApp) {
+        const orderMessage = `🛍️ NEW ORDER (PAID)\n[${order.Store_ID}] ORDER FOR: ${order.Customer_Name}\nPhone: ${order.Customer_Name}\n${order.Order_Items}\nTotal: R${order.Total_Amount}\nPickup: ${order.Pickup_Window}`;
+        const result = await sendWasenderMessage(storeWhatsApp, orderMessage);
+        if (result && result.success !== false) {
+          cookWhatsAppSent = true;
           console.log(`📱 Order forwarded to cook: ${storeWhatsApp}`);
+        } else {
+          console.error(`❌ Failed to send WhatsApp to cook: ${storeWhatsApp}`);
         }
-        
-        // Send confirmation to customer
-        if (order.Customer_Phone && order.Customer_Phone !== 'Not provided') {
-          const confirmMsg = `✅ Payment received! Your order has been confirmed.\n\n🍳 ${order.Store_ID}\n📦 ${order.Order_Items}\n💰 Total: R${order.Total_Amount}\n⏰ Pickup: ${order.Pickup_Window}\n\nThank you for ordering from BEIJU! 🇿🇦`;
-          await sendWasenderMessage(order.Customer_Phone, confirmMsg);
+      }
+      
+      // Send confirmation to customer
+      if (order.Customer_Phone && order.Customer_Phone !== 'Not provided') {
+        const confirmMsg = `✅ Payment received! Your order has been confirmed.\n\n🍳 ${order.Store_ID}\n📦 ${order.Order_Items}\n💰 Total: R${order.Total_Amount}\n⏰ Pickup: ${order.Pickup_Window}\n\nThank you for ordering from BEIJU! 🇿🇦`;
+        const result = await sendWasenderMessage(order.Customer_Phone, confirmMsg);
+        if (result && result.success !== false) {
+          customerWhatsAppSent = true;
           console.log(`📱 Confirmation sent to customer: ${order.Customer_Phone}`);
+        } else {
+          console.error(`❌ Failed to send WhatsApp to customer: ${order.Customer_Phone}`);
         }
+      }
+      
+      // Update whatsapp_sent status
+      if (cookWhatsAppSent || customerWhatsAppSent) {
+        await supabase
+          .from('Messages')
+          .update({ whatsapp_sent: true })
+          .eq('Message_ID', orderReference);
+        console.log(`✅ WhatsApp status updated for order: ${orderReference}`);
       }
     }
     

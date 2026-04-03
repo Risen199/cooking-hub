@@ -288,14 +288,17 @@ module.exports = async (req, res) => {
         const commissionPool = Number((totalAmount * 0.15).toFixed(2));
         const promoterCommission = Number((commissionPool * 0.35).toFixed(2));
         const companyCommission = Number((commissionPool * 0.65).toFixed(2));
+        
+        const messageId = 'msg_' + Date.now();
 
         // 1. Insert into Messages table
         await supabase
           .from('Messages')
           .insert([{
-            Message_ID: 'msg_' + Date.now(),
+            Message_ID: messageId,
             Store_ID: data.Store_ID || 'unknown',
             Customer_Name: data.Customer_Name || 'Customer',
+            Customer_Phone: data.Customer_Phone || 'Not provided',
             Order_Items: data.Order_Items || 'No items',
             Total_Amount: totalAmount,
             Commission_Pool: commissionPool,
@@ -305,7 +308,9 @@ module.exports = async (req, res) => {
             Delivery_Type: data.Delivery_Type || 'Collection',
             Status: 'Ordered',
             Timestamp: getSATimestamp(),
-            Source: 'Website'
+            Source: 'Website',
+            payment_status: data.payment_method === 'bank' ? 'pending' : 'paid',
+            whatsapp_sent: false
           }]);
 
         // 2. Insert into Consent_Logs table
@@ -326,29 +331,41 @@ module.exports = async (req, res) => {
             forwarded_to_store: false
           }]);
 
-        // 3. Send via WasenderAPI to central number
-        await sendWasenderMessage(waNumber, orderMessage);
-        
-      console.log('📱 Customer phone from order:', data.Customer_Phone);
+        // 3. ONLY send WhatsApp for non-bank payments
+        if (data.payment_method !== 'bank') {
+          // Send via WasenderAPI to central number
+          await sendWasenderMessage(waNumber, orderMessage);
+          
+          console.log('📱 Customer phone from order:', data.Customer_Phone);
 
-        // 4. Send auto-response to customer
-        if (data.Customer_Phone && data.Customer_Phone !== 'Not provided') {
-          await sendCustomerAutoResponse(
-            data.Customer_Phone, 
-            data.Store_ID,
-            { pickup_window: data.Pickup_Window || 'ASAP' }
-          );
+          // Send auto-response to customer
+          if (data.Customer_Phone && data.Customer_Phone !== 'Not provided') {
+            await sendCustomerAutoResponse(
+              data.Customer_Phone, 
+              data.Store_ID,
+              { pickup_window: data.Pickup_Window || 'ASAP' }
+            );
+          }
+
+          // Forward to store
+          await forwardOrderToStore(data.Store_ID, orderMessage, data.Customer_Phone);
+          
+          // Update whatsapp_sent to true for WhatsApp payments
+          await supabase
+            .from('Messages')
+            .update({ whatsapp_sent: true })
+            .eq('Message_ID', messageId);
+        } else {
+          console.log(`🏦 Bank payment order created (pending): ${messageId}`);
+          // No WhatsApp sent — will be sent by webhook after payment
         }
 
-        // 5. Forward to store silently
-        await forwardOrderToStore(data.Store_ID, orderMessage, data.Customer_Phone);
-
-        // 6. Return success with orderId
-      return res.status(200).json({ 
-        success: true,
-        orderId: 'msg_' + Date.now(),  // ← ADD THIS LINE
-        message: 'Order processed with WasenderAPI'
-      });
+        // Return success with orderId
+        return res.status(200).json({ 
+          success: true,
+          orderId: messageId,
+          message: 'Order processed'
+        });
       }
     }
 
