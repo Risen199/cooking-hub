@@ -80,8 +80,7 @@ module.exports = async (req, res) => {
         .from('Messages')
         .update({ 
           payment_status: 'paid', 
-          payment_id: paymentId,
-          status: 'Ordered'
+          payment_id: paymentId
         })
         .eq('Message_ID', order.Message_ID);
       
