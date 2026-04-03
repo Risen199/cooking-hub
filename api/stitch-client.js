@@ -62,15 +62,12 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         amount: Math.round(amount * 100),
-        currency: 'ZAR',
-        reference: cleanReference,
         merchantReference: cleanReference,
-        returnUrl: 'https://beiju.co.za/order-confirmation',
-        cancelUrl: 'https://beiju.co.za/checkout',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         payerName: customerName,
-        payerEmail: customerEmail || 'customer@beiju.co.za',
-        payerPhone: formattedPhone,
-        description: `Order ${orderId} from BEIJU`
+        payerEmailAddress: customerEmail || 'customer@beiju.co.za',
+        payerPhoneNumber: formattedPhone,
+        skipCheckoutPage: false
       })
     });
     
@@ -86,8 +83,8 @@ module.exports = async (req, res) => {
       });
     }
     
-    // ✅ Extract the payment URL from the correct path
-    const paymentUrl = paymentData.data?.payment?.link;
+    // Extract the payment URL
+    let paymentUrl = paymentData.data?.payment?.link;
     const paymentId = paymentData.data?.payment?.id;
     
     if (!paymentUrl) {
@@ -97,6 +94,10 @@ module.exports = async (req, res) => {
         error: 'Stitch did not return a payment URL' 
       });
     }
+    
+    // Append returnUrl as query parameter
+    const returnUrl = encodeURIComponent('https://beiju.co.za/order-confirmation');
+    paymentUrl = `${paymentUrl}?redirect_url=${returnUrl}`;
     
     console.log('✅ Payment URL created:', paymentUrl);
     
