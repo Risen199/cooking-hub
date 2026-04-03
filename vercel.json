@@ -1,4 +1,5 @@
 {
+  "trailingSlash": false,
   "rewrites": [
     { "source": "/smu", "destination": "/hub.html?township=SMU" },
     { "source": "/thoyandou", "destination": "/hub.html?township=THO" },
