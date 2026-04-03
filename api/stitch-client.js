@@ -63,6 +63,7 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         amount: Math.round(amount * 100),
         currency: 'ZAR',
+        reference: cleanReference,
         merchantReference: cleanReference,
         returnUrl: 'https://beiju.co.za/order-confirmation',
         cancelUrl: 'https://beiju.co.za/checkout',
