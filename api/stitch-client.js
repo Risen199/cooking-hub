@@ -97,7 +97,7 @@ module.exports = async (req, res) => {
     }
     
     // Append returnUrl as query parameter
-    const returnUrl = encodeURIComponent('https://beiju.co.za/order-confirmation.html');
+    const returnUrl = encodeURIComponent('https://beiju.co.za/order-confirmation');
     paymentUrl = `${paymentUrl}?redirect_url=${returnUrl}`;
     
     console.log('✅ Payment URL created:', paymentUrl);
