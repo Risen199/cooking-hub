@@ -1,5 +1,9 @@
 {
-  "trailingSlash": false,
+  "functions": {
+    "api/stitch-webhook.js": {
+      "excludeFiles": "{node_modules/.pnpm/**}"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/stitch-webhook",
