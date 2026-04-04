@@ -9,6 +9,10 @@
       "source": "/api/stitch-webhook",
       "destination": "/api/stitch-webhook.js"
     },
+    {
+      "source": "/order-confirmation",
+      "destination": "/order-confirmation.html"
+    },
     { "source": "/smu", "destination": "/hub.html?township=SMU" },
     { "source": "/thoyandou", "destination": "/hub.html?township=THO" },
     { "source": "/soweto", "destination": "/hub.html?township=SWT" },
