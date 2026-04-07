@@ -24,6 +24,8 @@
     { "source": "/Mankweng", "destination": "/hub.html?township=MAN" },
     { "source": "/seshego", "destination": "/hub.html?township=SES" },
     { "source": "/Vanderbijlpark", "destination": "/hub.html?township=VDK" },
+    { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
+    { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
     { "source": "/mama-lerato", "destination": "/store-view.html?storeId=bdp_02" },
@@ -63,6 +65,9 @@
     { "source": "/chef-bobbys", "destination": "/store-view.html?storeId=vdk_01" },
     { "source": "/mama-rose", "destination": "/store-view.html?storeId=vdk_02" },
     { "source": "/sis-pinky", "destination": "/store-view.html?storeId=vdk_03" },
-    { "source": "/aunty-joyce", "destination": "/store-view.html?storeId=vdk_04" }
+    { "source": "/aunty-joyce", "destination": "/store-view.html?storeId=vdk_04" },
+    { "source": "/tower-flames", "destination": "/store-view.html?storeId=ort_01" },
+    { "source": "/bungee-bites", "destination": "/store-view.html?storeId=ort_02" },
+    { "source": "/painted-plate", "destination": "/store-view.html?storeId=ort_03" }
   ]
 }
