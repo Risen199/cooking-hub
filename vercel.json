@@ -27,6 +27,7 @@
     { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
     { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
+    { "source": "/ma-jabus", "destination": "/store-view.html?storeId=blb_09" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
     { "source": "/mama-lerato", "destination": "/store-view.html?storeId=bdp_02" },
     { "source": "/aunty-mapula", "destination": "/store-view.html?storeId=bdp_04" },
