@@ -71,8 +71,8 @@
     { "source": "/tower-flames", "destination": "/store-view.html?storeId=ort_01" },
     { "source": "/bungee-bites", "destination": "/store-view.html?storeId=ort_02" },
     { "source": "/painted-plate", "destination": "/store-view.html?storeId=ort_03" },
-    { "source": "/Genial-Godfather-kitchen", "destination": "/store-view.html?storeId=sos_01" },
-    { "source": "/nn-flames-kitchen", "destination": "/store-view.html?storeId=sos_02" },
-    { "source": "/ia-bistro", "destination": "/store-view.html?storeId=sos_03" }
+    { "source": "/Genial-Godfather-kitchen", "destination": "/store-view.html?storeId=sosg_01" },
+    { "source": "/nn-flames-kitchen", "destination": "/store-view.html?storeId=sosg_02" },
+    { "source": "/ia-bistro", "destination": "/store-view.html?storeId=sosg_03" }
   ]
 }
