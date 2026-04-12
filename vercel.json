@@ -25,7 +25,7 @@
     { "source": "/seshego", "destination": "/hub.html?township=SES" },
     { "source": "/Vanderbijlpark", "destination": "/hub.html?township=VDK" },
     { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
-    { "source": "/SNV", "destination": "/hub.html?township=SNV" },
+    { "source": "/Soshanguve", "destination": "/hub.html?township=SNV" },
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
     { "source": "/ma-jabus", "destination": "/store-view.html?storeId=blb_09" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
@@ -70,8 +70,8 @@
     { "source": "/tower-flames", "destination": "/store-view.html?storeId=ort_01" },
     { "source": "/bungee-bites", "destination": "/store-view.html?storeId=ort_02" },
     { "source": "/painted-plate", "destination": "/store-view.html?storeId=ort_03" },
-    { "source": "/SNV-01", "destination": "/store-view.html?storeId=SNV_01" },
-    { "source": "/SNV-02", "destination": "/store-view.html?storeId=SNV_02" },
-    { "source": "/SNV-03", "destination": "/store-view.html?storeId=SNV_03" }
+    { "source": "/genial-godfather-kitchen", "destination": "/store-view.html?storeId=SNV_01" },
+    { "source": "/nn-flames-kitchen", "destination": "/store-view.html?storeId=SNV_02" },
+    { "source": "/ia-bistro", "destination": "/store-view.html?storeId=SNV_03" }
   ]
 }
