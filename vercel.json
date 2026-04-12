@@ -26,7 +26,7 @@
     { "source": "/Vanderbijlpark", "destination": "/hub.html?township=VDK" },
     { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
     { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
-    { "source": "/soshanguave", "destination": "/hub.html?township=SOS" },
+    { "source": "/soshanguave", "destination": "/hub.html?township=SOSG" },
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
     { "source": "/ma-jabus", "destination": "/store-view.html?storeId=blb_09" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
