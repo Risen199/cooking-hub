@@ -26,6 +26,7 @@
     { "source": "/Vanderbijlpark", "destination": "/hub.html?township=VDK" },
     { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
     { "source": "/Soshanguve", "destination": "/hub.html?township=SNV" },
+    { "source": "/Umlazi", "destination": "/hub.html?township=UML" },
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
     { "source": "/ma-jabus", "destination": "/store-view.html?storeId=blb_09" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
@@ -72,6 +73,10 @@
     { "source": "/painted-plate", "destination": "/store-view.html?storeId=ort_03" },
     { "source": "/genial-godfather-kitchen", "destination": "/store-view.html?storeId=SNV_01" },
     { "source": "/nn-flames-kitchen", "destination": "/store-view.html?storeId=SNV_02" },
-    { "source": "/ia-bistro", "destination": "/store-view.html?storeId=SNV_03" }
+    { "source": "/ia-bistro", "destination": "/store-view.html?storeId=SNV_03" },
+    { "source": "/u-anti", "destination": "/store-view.html?storeId=UML_01" },
+    { "source": "/umama", "destination": "/store-view.html?storeId=UML_02" },
+    { "source": "/undodakazi", "destination": "/store-view.html?storeId=UML_03" },
+    { "source": "/unkosazana", "destination": "/store-view.html?storeId=UML_04" }
   ]
 }
