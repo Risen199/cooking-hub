@@ -444,7 +444,7 @@
 
   async function createStitchPayment(orderId, amount, customerPhone, customerEmail, customerName) {
     try {
-      const response = await fetch('/api/stitch-client', {
+      const response = await fetch('/api/yoco-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
