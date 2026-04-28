@@ -10,6 +10,14 @@
       "destination": "/api/stitch-webhook.js"
     },
     {
+      "source": "/api/yoco-checkout",
+      "destination": "/api/yoco-checkout.js"
+    },
+    {
+      "source": "/api/yoco-webhook",
+      "destination": "/api/yoco-webhook.js"
+    },
+    {
       "source": "/order-confirmation",
       "destination": "/order-confirmation.html"
     },
