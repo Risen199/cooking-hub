@@ -792,31 +792,33 @@
                 
                 const internationalPhone = cleanPhone.startsWith('27') ? `+${cleanPhone}` : `+27${cleanPhone.slice(1)}`;
 
-                // BANK PAYMENT FLOW
+                // BANK PAYMENT FLOW with Yoco
                 if (store.payment_method === 'bank') {
 
-                  console.log('🔧 Creating Stitch payment link first...');
+                  console.log('🔧 Creating Yoco checkout...');
                   
-                  const tempId = 'temp_' + Date.now();
-                  const stitchResult = await createStitchPayment(
-                    tempId,
-                    total,
-                    internationalPhone,
-                    'customer@example.com',
-                    name
-                  );
-
-                  if (!stitchResult.success || !stitchResult.linkId) {
+                  const myOrderId = 'msg_' + Date.now();
+                  
+                  // Step 1: Create Yoco checkout session
+                  const checkoutResponse = await fetch('/api/yoco-checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      amount: total,
+                      orderId: myOrderId,
+                      customerName: name,
+                      customerEmail: 'customer@example.com'
+                    })
+                  });
+                  
+                  const checkoutData = await checkoutResponse.json();
+                  
+                  if (!checkoutData.success || !checkoutData.redirectUrl) {
                     alert('Payment gateway error. Please try again or use WhatsApp payment.');
                     return;
                   }
-
-                  const stitchLinkId = stitchResult.linkId;
-                  const myOrderId = 'msg_' + Date.now();
-
-                  console.log('📦 Stitch linkId obtained:', stitchLinkId);
-                  console.log('📦 Creating order with linkId...');
-
+                  
+                  // Step 2: Create order in database (pending payment)
                   const orderResponse = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -834,14 +836,14 @@
                       consentTimestamp: new Date().toISOString(),
                       payment_method: 'bank',
                       payment_status: 'pending',
-                      stitch_link_id: stitchLinkId,
                       Message_ID: myOrderId
                     })
                   });
-
+                  
                   const orderData = await orderResponse.json();
-
+                  
                   if (orderData.success) {
+                    // Show loading overlay
                     const loadingOverlay = document.createElement('div');
                     loadingOverlay.id = 'payment-loading';
                     loadingOverlay.style.cssText = `
@@ -859,19 +861,19 @@
                       color: white;
                       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                     `;
-
+                    
                     const paymentMessages = [
                       "💰 Preparing your secure payment...",
-                      "🔗 Connecting to Stitch...",
+                      "🔗 Connecting to Yoco...",
                       "💳 Almost there...",
                       "🛡️ Verifying payment gateway...",
                       "✅ Finalizing your order...",
                       "🍽️ Your food is almost ready..."
                     ];
-
+                    
                     let paymentMessageIndex = 0;
                     let paymentMessageInterval;
-
+                    
                     loadingOverlay.innerHTML = `
                       <div style="text-align: center;">
                         <div style="font-size: 3rem; font-weight: 900; color: #ff0000; animation: pulse 1.5s ease-in-out infinite; margin-bottom: 20px;">BEIJU</div>
@@ -880,19 +882,19 @@
                       </div>
                     `;
                     document.body.appendChild(loadingOverlay);
-
+                    
                     paymentMessageInterval = setInterval(() => {
                       paymentMessageIndex = (paymentMessageIndex + 1) % paymentMessages.length;
                       const msgEl = document.getElementById('payment-loading-message');
                       if (msgEl) msgEl.textContent = paymentMessages[paymentMessageIndex];
                     }, 2000);
                     
-                    setTimeout(() => {
-                      window.location.href = stitchResult.url;
-                    }, 500);
+                    // Redirect to Yoco payment page
+                    window.location.href = checkoutData.redirectUrl;
                   } else {
                     alert('Error creating order. Please try again.');
                   }
+
                 } else {
                   // WHATSAPP PAYMENT FLOW
                   fetch(API_URL, {
@@ -955,5 +957,5 @@
     }
   });
 </script>
-</body> 
+</body>
 </html>
