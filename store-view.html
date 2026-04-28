@@ -800,7 +800,7 @@
                   const myOrderId = 'msg_' + Date.now();
                   
                   // Step 1: Create Yoco checkout session
-                  const checkoutResponse = await fetch('/api/yoco-checkout', {
+                  const checkoutResponse = await fetch('https://www.beiju.co.za/api/yoco-checkout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
