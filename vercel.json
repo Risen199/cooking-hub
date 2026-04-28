@@ -1,26 +1,6 @@
 {
-  "functions": {
-    "api/stitch-webhook.js": {
-      "excludeFiles": "{node_modules/.pnpm/**}"
-    }
-  },
   "rewrites": [
-    {
-      "source": "/api/stitch-webhook",
-      "destination": "/api/stitch-webhook.js"
-    },
-    {
-      "source": "/api/yoco-checkout",
-      "destination": "/api/yoco-checkout.js"
-    },
-    {
-      "source": "/api/yoco-webhook",
-      "destination": "/api/yoco-webhook.js"
-    },
-    {
-      "source": "/order-confirmation",
-      "destination": "/order-confirmation.html"
-    },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/smu", "destination": "/hub.html?township=SMU" },
     { "source": "/thoyandou", "destination": "/hub.html?township=THO" },
     { "source": "/soweto", "destination": "/hub.html?township=SWT" },
@@ -35,6 +15,7 @@
     { "source": "/orlando-towers", "destination": "/hub.html?township=ORT" },
     { "source": "/Soshanguve", "destination": "/hub.html?township=SNV" },
     { "source": "/Umlazi", "destination": "/hub.html?township=UML" },
+    { "source": "/order-confirmation", "destination": "/order-confirmation.html" },
     { "source": "/aunty-thandi", "destination": "/store-view.html?storeId=blb_01" },
     { "source": "/ma-jabus", "destination": "/store-view.html?storeId=blb_09" },
     { "source": "/bontles", "destination": "/store-view.html?storeId=bdp_01" },
